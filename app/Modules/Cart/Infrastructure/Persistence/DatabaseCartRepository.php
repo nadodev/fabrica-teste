@@ -21,9 +21,15 @@ final readonly class DatabaseCartRepository implements CartRepository
         return $this->hydrate($this->database->table('cart_carts')->where('id', $id)->where('status', 'active')->first());
     }
 
-    public function findByTokenHash(string $tokenHash): ?Cart
+    public function findByTokenHash(string $tokenHash, bool $onlyActive = true): ?Cart
     {
-        return $this->hydrate($this->database->table('cart_carts')->where('token_hash', $tokenHash)->where('status', 'active')->first());
+        $query = $this->database->table('cart_carts')->where('token_hash', $tokenHash);
+
+        if ($onlyActive) {
+            $query->where('status', 'active');
+        }
+
+        return $this->hydrate($query->first());
     }
 
     public function save(Cart $cart): void
@@ -54,6 +60,21 @@ final readonly class DatabaseCartRepository implements CartRepository
             }
 
             throw $exception;
+        }
+
+        $cart->markPersisted();
+    }
+
+    public function markConverted(Cart $cart): void
+    {
+        $updated = $this->database->table('cart_carts')
+            ->where('id', $cart->id)
+            ->where('version', $cart->version())
+            ->where('status', 'active')
+            ->update(['status' => 'converted', 'version' => $cart->version() + 1, 'updated_at' => now()]);
+
+        if ($updated !== 1) {
+            throw new CartConcurrencyConflict('Cart could not be converted.');
         }
 
         $cart->markPersisted();

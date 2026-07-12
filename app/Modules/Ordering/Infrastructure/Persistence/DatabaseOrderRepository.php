@@ -58,6 +58,13 @@ final readonly class DatabaseOrderRepository implements OrderRepository
         );
     }
 
+    public function findByCartId(string $cartId): ?Order
+    {
+        $id = $this->database->table('ordering_orders')->where('cart_id', $cartId)->value('id');
+
+        return $id === null ? null : $this->find((string) $id);
+    }
+
     public function save(Order $order): void
     {
         $this->database->transaction(function () use ($order): void {

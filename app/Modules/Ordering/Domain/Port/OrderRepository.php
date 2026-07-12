@@ -12,5 +12,7 @@ interface OrderRepository
 
     public function find(string $id): ?Order;
 
+    public function findByCartId(string $cartId): ?Order;
+
     public function save(Order $order): void;
 }
