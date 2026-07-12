@@ -61,8 +61,9 @@ final readonly class EnsureIdempotency
 
     private function scope(Request $request): string
     {
-        $actor = $request->user()?->getAuthIdentifier()
-            ?? ($request->hasSession() ? $request->session()->getId() : $request->ip());
+        $actor = $request->user() === null
+            ? 'anonymous'
+            : 'user:'.$request->user()->getAuthIdentifier();
         $operation = $request->route()?->getName() ?? $request->path();
 
         return hash('sha256', $actor.'|'.$operation);
