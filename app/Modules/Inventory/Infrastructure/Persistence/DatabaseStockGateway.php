@@ -29,10 +29,6 @@ final readonly class DatabaseStockGateway implements StockGateway, StockManager
         }
 
         $this->database->transaction(function () use ($reference, $productId, $quantity): void {
-            if ($this->database->table('inventory_movements')->where('reference', $reference)->exists()) {
-                return;
-            }
-
             $this->database->table('inventory_stock')->insertOrIgnore([
                 'product_id' => $productId,
                 'on_hand' => 0,
