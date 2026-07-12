@@ -8,7 +8,7 @@ Loja virtual modular com Laravel, Inertia e React. Um projeto de portfólio cria
 
 ## PROGRESSO
 
-**40%**
+**65%**
 
 [Repositório](https://github.com/nadodev/fabrica-teste)
 
@@ -94,6 +94,9 @@ ADRs registram o contexto e as consequências das decisões mais importantes.
 - Idempotência persistida para comandos comerciais.
 - Estoque transacional com reservas e ledger de movimentações.
 - Rate limits e headers de segurança em modo compatível com observação de CSP.
+- Carrinho persistido e checkout local com reserva de estoque.
+- Pedidos com snapshots imutáveis dos itens.
+- Dashboard administrativo protegido para cadastrar e publicar produtos.
 
 ## Próximas etapas
 
@@ -103,6 +106,7 @@ ADRs registram o contexto e as consequências das decisões mais importantes.
 - Adicionar o primeiro adaptador real de pagamento.
 - Implementar cotação de frete por adaptadores.
 - Criar área administrativa, autenticação e autorização.
+- Evoluir o dashboard com edição, imagens, variantes e gestão de estoque.
 - Implementar outbox, webhooks assinados e observabilidade.
 
 O diagnóstico completo está em [docs/security-readiness.md](docs/security-readiness.md), e o plano funcional em [docs/ecommerce-roadmap.md](docs/ecommerce-roadmap.md).

@@ -14,8 +14,8 @@
 | Pagamentos | Apenas porta | Sim |
 | Frete | Apenas porta | Sim |
 | Clientes e endereços | Não implementado | Sim |
-| Painel administrativo | Não implementado | Sim |
-| Autenticação/autorização | Não implementado | Sim |
+| Painel administrativo | Cadastro de produtos implementado | Sim |
+| Autenticação/autorização | Administração implementada | Sim |
 | Webhooks e reconciliação | Não implementado | Sim |
 | Observabilidade operacional | Não implementado | Sim |
 | LGPD e políticas comerciais | Não implementado | Sim |
@@ -115,4 +115,3 @@
 - Testes cobrem sucesso, falha, retry e limites.
 - Métricas e procedimento de recuperação existem.
 - Migration possui rollback e deploy compatível.
-

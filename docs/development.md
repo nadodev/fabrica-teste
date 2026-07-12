@@ -87,6 +87,33 @@ O adaptador de estoque utiliza transações e `lockForUpdate`. Testes rápidos r
 
 Não faça chamadas de gateway durante a transação do banco.
 
+## Dashboard administrativo
+
+Depois de executar as migrations e seeds, acesse:
+
+```text
+/admin/login
+```
+
+No ambiente local, quando `ADMIN_PASSWORD` estiver vazio, o seeder cria:
+
+```text
+E-mail: admin@example.com
+Senha: password
+```
+
+Essa senha existe somente para facilitar desenvolvimento. Em produção, defina `ADMIN_NAME`, `ADMIN_EMAIL` e uma `ADMIN_PASSWORD` forte antes de executar o seed. Sem senha configurada, o seeder não cria administrador em produção.
+
+O primeiro dashboard permite listar produtos e cadastrar nome, SKU, descrição, preço, status e URL temporária de imagem. Produtos em `draft` não aparecem no catálogo público; produtos `active` aparecem imediatamente.
+
+Próximas evoluções do painel:
+
+- upload seguro e processamento de imagens;
+- edição e arquivamento;
+- categorias, variantes, cores e tamanhos;
+- entrada e ajuste de estoque;
+- consulta de pedidos e pagamentos.
+
 ## Commits
 
 O histórico segue Conventional Commits:
