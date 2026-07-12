@@ -1,4 +1,4 @@
-import { Link } from "@inertiajs/react";
+import { Link, router } from "@inertiajs/react";
 import { ArrowLeft, Minus, Plus, ShoppingCart } from "lucide-react";
 import { useState } from "react";
 import fallbackImage from "@/assets/prod-polo.jpg";
@@ -7,7 +7,20 @@ import { formatMoney } from "@/modules/catalog/domain/product";
 
 export default function ProdutoDetalhe({ product }: { product: CatalogProduct }) {
   const [quantity, setQuantity] = useState(1);
+  const [adding, setAdding] = useState(false);
   const image = product.imageUrl ?? fallbackImage;
+
+  const addToCart = () => {
+    setAdding(true);
+    router.post(
+      "/carrinho/itens",
+      { productId: product.id, quantity },
+      {
+        headers: { "Idempotency-Key": crypto.randomUUID() },
+        onFinish: () => setAdding(false),
+      },
+    );
+  };
 
   return (
     <div className="bg-bg-soft">
@@ -43,9 +56,9 @@ export default function ProdutoDetalhe({ product }: { product: CatalogProduct })
             </div>
           </div>
 
-          <Link href="/carrinho" className="mt-7 inline-flex w-full items-center justify-center gap-2 rounded-md bg-yellow px-6 py-3 font-black text-navy">
-            <ShoppingCart className="h-5 w-5" /> Adicionar ao carrinho
-          </Link>
+          <button disabled={adding} onClick={addToCart} className="mt-7 inline-flex w-full items-center justify-center gap-2 rounded-md bg-yellow px-6 py-3 font-black text-navy disabled:opacity-60">
+            <ShoppingCart className="h-5 w-5" /> {adding ? "Adicionando..." : "Adicionar ao carrinho"}
+          </button>
         </section>
       </main>
     </div>

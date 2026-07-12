@@ -8,7 +8,14 @@ use App\Modules\Shared\Domain\ValueObject\Money;
 
 final readonly class CartItem
 {
-    public function __construct(public string $productId, public string $name, public Money $unitPrice, public int $quantity) {}
+    public function __construct(
+        public string $productId,
+        public string $name,
+        public Money $unitPrice,
+        public int $quantity,
+        public string $sku = '',
+        public ?string $imageUrl = null,
+    ) {}
 
     public function subtotal(): Money
     {

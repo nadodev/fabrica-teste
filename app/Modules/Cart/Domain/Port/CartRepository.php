@@ -10,5 +10,7 @@ interface CartRepository
 {
     public function find(string $id): ?Cart;
 
+    public function findByTokenHash(string $tokenHash): ?Cart;
+
     public function save(Cart $cart): void;
 }
