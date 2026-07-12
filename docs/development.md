@@ -104,12 +104,12 @@ Senha: password
 
 Essa senha existe somente para facilitar desenvolvimento. Em produção, defina `ADMIN_NAME`, `ADMIN_EMAIL` e uma `ADMIN_PASSWORD` forte antes de executar o seed. Sem senha configurada, o seeder não cria administrador em produção.
 
-O primeiro dashboard permite listar produtos e cadastrar nome, SKU, descrição, preço, status e URL temporária de imagem. Produtos em `draft` não aparecem no catálogo público; produtos `active` aparecem imediatamente.
+O dashboard permite listar, cadastrar, editar e arquivar produtos. Produtos em `draft` não aparecem no catálogo público; produtos `active` aparecem imediatamente; produtos `archived` permanecem no histórico e deixam de ser vendidos.
+
+Imagens podem ser JPEG, PNG ou WebP, com até 4 MB e dimensões máximas de 4000×4000 px. Os nomes são gerados pelo storage, SVG não é permitido e arquivos substituídos são removidos somente depois da atualização do produto ser confirmada. Execute `php artisan storage:link` em cada ambiente publicado.
 
 Próximas evoluções do painel:
 
-- upload seguro e processamento de imagens;
-- edição e arquivamento;
 - categorias, variantes, cores e tamanhos;
 - entrada e ajuste de estoque;
 - consulta de pedidos e pagamentos.

@@ -14,7 +14,7 @@
 | Pagamentos | Apenas porta | Sim |
 | Frete | Apenas porta | Sim |
 | Clientes e endereços | Não implementado | Sim |
-| Painel administrativo | Cadastro de produtos implementado | Sim |
+| Painel administrativo | CRUD seguro de produtos implementado | Sim |
 | Autenticação/autorização | Administração implementada | Sim |
 | Webhooks e reconciliação | Não implementado | Sim |
 | Observabilidade operacional | Não implementado | Sim |
