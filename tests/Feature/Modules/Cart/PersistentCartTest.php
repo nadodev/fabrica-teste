@@ -25,7 +25,7 @@ it('persists a server-priced anonymous cart and safely replays the command', fun
     $payload = ['productId' => '0190f566-c399-79e3-a553-7e5fb8d83440', 'quantity' => 2];
     $headers = ['Idempotency-Key' => 'cart-add-001'];
 
-    $this->post(route('carrinho.itens.store'), $payload, $headers)->assertRedirect(route('carrinho'));
+    $this->post(route('carrinho.itens.store'), $payload, $headers)->assertRedirect('/');
     $this->post(route('carrinho.itens.store'), $payload, $headers)->assertStatus(302);
 
     $this->assertDatabaseCount('cart_carts', 1);

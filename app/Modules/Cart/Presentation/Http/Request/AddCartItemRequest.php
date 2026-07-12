@@ -14,6 +14,7 @@ final class AddCartItemRequest extends FormRequest
         return [
             'productId' => ['required', 'uuid'],
             'quantity' => ['required', 'integer', 'min:1', 'max:100'],
+            'variationId' => ['nullable', 'string', 'max:40'],
         ];
     }
 }

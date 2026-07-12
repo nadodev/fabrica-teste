@@ -15,9 +15,13 @@ final readonly class CreateProduct
 {
     public function __construct(private ProductRepository $products) {}
 
-    public function handle(string $id, string $sku, string $name, string $description, int $priceAmount, string $status, ?string $imageUrl): Product
+    /**
+     * @param list<string> $galleryImages
+     * @param list<array{name: string, values: list<string>}> $variations
+     */
+    public function handle(string $id, string $sku, string $name, string $description, int $priceAmount, string $status, ?string $imageUrl, string $category = 'Uniformes', array $galleryImages = [], array $variations = []): Product
     {
-        $product = new Product(ProductId::fromString($id), new Sku($sku), $name, $description, new Money($priceAmount), ProductStatus::from($status), $imageUrl);
+        $product = new Product(ProductId::fromString($id), new Sku($sku), $name, $description, new Money($priceAmount), ProductStatus::from($status), $imageUrl, $category, $galleryImages, $variations);
         $this->products->save($product);
 
         return $product;

@@ -1,4 +1,6 @@
-import { Link } from "@inertiajs/react";
+import { Link, router } from "@inertiajs/react";
+import type { FormEvent } from "react";
+import { useEffect, useState } from "react";
 import {
   Building2,
   ChevronDown,
@@ -26,7 +28,38 @@ const departments = [
   { href: "/personalizados", label: "Personalizados", icon: Factory },
 ];
 
-export function SiteHeader() {
+type SiteSettings = {
+  storeName: string;
+  logoUrl: string;
+};
+
+type CartSummary = {
+  itemsCount?: number;
+};
+
+export function SiteHeader({ settings, initialCartItemsCount }: { settings: SiteSettings; initialCartItemsCount: number }) {
+  const [cartItemsCount, setCartItemsCount] = useState(initialCartItemsCount);
+  const [searchTerm, setSearchTerm] = useState("");
+  const cartBadge = cartItemsCount > 99 ? "99+" : String(cartItemsCount);
+
+  const submitSearch = (event: FormEvent) => {
+    event.preventDefault();
+    const term = searchTerm.trim();
+
+    router.visit(term ? `/produtos?busca=${encodeURIComponent(term)}` : "/produtos");
+  };
+
+  useEffect(() => {
+    setCartItemsCount(initialCartItemsCount);
+  }, [initialCartItemsCount]);
+
+  useEffect(() => {
+    return router.on("success", (event) => {
+      const cartSummary = event.detail.page.props.cartSummary as CartSummary | undefined;
+      setCartItemsCount(cartSummary?.itemsCount ?? 0);
+    });
+  }, []);
+
   return (
     <header className="sticky top-0 z-40 bg-white shadow-[0_8px_24px_-22px_var(--color-navy)]">
       <div className="bg-navy text-white">
@@ -49,17 +82,19 @@ export function SiteHeader() {
       <div className="border-b border-border bg-white">
         <div className="mx-auto grid max-w-7xl grid-cols-[1fr_auto] items-center gap-3 px-3 py-3 md:grid-cols-[230px_1fr_auto] md:px-4">
           <Link href="/" className="flex w-fit items-center rounded-xl border border-border bg-white p-2 shadow-[var(--shadow-soft)]">
-            <img src="/logo.png" width={188} alt="Fábrica de Fardamentos" className="max-h-10 w-auto md:max-h-12" />
+            <img src={settings.logoUrl} width={188} alt={settings.storeName} className="max-h-10 w-auto md:max-h-12" />
           </Link>
 
-          <div className="relative order-3 col-span-2 md:order-none md:col-span-1">
+          <form onSubmit={submitSearch} className="relative order-3 col-span-2 md:order-none md:col-span-1">
             <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-navy" />
             <input
               type="search"
               placeholder="Buscar uniformes..."
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
               className="h-11 w-full rounded-xl border-2 border-navy bg-bg-soft pl-12 pr-4 text-sm font-medium outline-none transition focus:border-yellow focus:bg-white md:h-12"
             />
-          </div>
+          </form>
 
           <div className="flex items-center justify-between gap-2 md:justify-end">
             <a href="mailto:fabricadefardamentos@gmail.com" className="hidden rounded-xl border border-border bg-bg-soft px-3 py-2 text-xs font-bold text-navy transition hover:border-navy md:inline-flex">
@@ -67,7 +102,7 @@ export function SiteHeader() {
             </a>
             <Link href="/carrinho" className="relative inline-flex items-center gap-2 rounded-xl bg-yellow px-3 py-2.5 text-sm font-black text-navy shadow-[var(--shadow-soft)] transition hover:brightness-95 sm:px-5 sm:py-3">
               <ShoppingCart className="h-4 w-4" /> <span className="hidden sm:inline">Carrinho</span>
-              <span className="absolute -right-2 -top-2 grid h-5 min-w-5 place-items-center rounded-full bg-navy px-1 text-[11px] text-white">2</span>
+              <span className="absolute -right-2 -top-2 grid h-5 min-w-5 place-items-center rounded-full bg-navy px-1 text-[11px] text-white">{cartBadge}</span>
             </Link>
             <Link href="/produtos" className="rounded-xl border border-border p-2.5 text-navy md:hidden" aria-label="Produtos">
               <Menu className="h-5 w-5" />
@@ -117,6 +152,7 @@ export function SiteHeader() {
 
           <Link href="/carrinho" className="ml-auto hidden items-center gap-2 rounded-md bg-white/10 px-3 py-2 text-sm font-bold text-white transition hover:bg-white/20 lg:inline-flex">
             <ShoppingCart className="h-4 w-4 text-yellow" /> Carrinho
+            <span className="grid h-5 min-w-5 place-items-center rounded-full bg-yellow px-1 text-[11px] font-black text-navy">{cartBadge}</span>
           </Link>
         </div>
       </nav>

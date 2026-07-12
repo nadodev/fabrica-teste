@@ -14,6 +14,7 @@ use App\Modules\Catalog\Presentation\Http\Request\StoreProductRequest;
 use App\Modules\Catalog\Presentation\Http\Request\UpdateProductRequest;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
@@ -37,21 +38,29 @@ final class AdminProductController extends Controller
     {
         $data = $request->validated();
         [$imageUrl, $storedPath] = $this->resolveNewImage($request->file('image'), $data['imageUrl'] ?? null);
+        [$gallery, $storedGalleryPaths] = $this->storeGalleryImages($request->file('galleryImages', []));
+        $variations = $request->variations();
 
         try {
+            $productId = (string) Str::uuid();
             $command->handle(
-                (string) Str::uuid(),
+                $productId,
                 (string) $data['sku'],
                 (string) $data['name'],
                 (string) ($data['description'] ?? ''),
                 $request->priceInCents(),
                 (string) $data['status'],
                 $imageUrl,
+                (string) ($data['category'] ?? 'Uniformes'),
+                $this->galleryWithMainImage($imageUrl, $gallery),
+                $variations,
             );
+            $this->syncStock($productId, $this->stockQuantity((int) ($data['stock'] ?? 100), $variations));
         } catch (Throwable $exception) {
             if ($storedPath !== null) {
                 Storage::disk('public')->delete($storedPath);
             }
+            Storage::disk('public')->delete($storedGalleryPaths);
 
             throw $exception;
         }
@@ -73,13 +82,28 @@ final class AdminProductController extends Controller
         abort_if($current === null, 404);
         $data = $request->validated();
         [$imageUrl, $storedPath] = $this->resolveUpdatedImage($request, $current->imageUrl);
+        [$uploadedGallery, $storedGalleryPaths] = $this->storeGalleryImages($request->file('galleryImages', []));
+        $gallery = [...$request->existingGalleryImages(), ...$uploadedGallery];
+        $variations = $request->variations();
 
         try {
-            $command->handle($product, (string) $data['name'], (string) ($data['description'] ?? ''), $request->priceInCents(), (string) $data['status'], $imageUrl);
+            $command->handle(
+                $product,
+                (string) $data['name'],
+                (string) ($data['description'] ?? ''),
+                $request->priceInCents(),
+                (string) $data['status'],
+                $imageUrl,
+                (string) ($data['category'] ?? 'Uniformes'),
+                $this->galleryWithMainImage($imageUrl, $gallery),
+                $variations,
+            );
+            $this->syncStock($product, $this->stockQuantity((int) ($data['stock'] ?? $current->stockAvailable), $variations));
         } catch (Throwable $exception) {
             if ($storedPath !== null) {
                 Storage::disk('public')->delete($storedPath);
             }
+            Storage::disk('public')->delete($storedGalleryPaths);
 
             throw $exception;
         }
@@ -87,6 +111,7 @@ final class AdminProductController extends Controller
         if ($current->imageUrl !== $imageUrl) {
             $this->deleteManagedImage($current->imageUrl);
         }
+        $this->deleteRemovedGalleryImages($current->galleryImages, $this->galleryWithMainImage($imageUrl, $gallery));
 
         return to_route('admin.products.index')->with('success', 'Produto atualizado com sucesso.');
     }
@@ -135,5 +160,82 @@ final class AdminProductController extends Controller
         if ($url !== null && str_starts_with($url, '/storage/products/')) {
             Storage::disk('public')->delete(substr($url, strlen('/storage/')));
         }
+    }
+
+    /** @param array<int, UploadedFile>|UploadedFile|null $files @return array{list<string>, list<string>} */
+    private function storeGalleryImages(array|UploadedFile|null $files): array
+    {
+        $files = $files instanceof UploadedFile ? [$files] : ($files ?? []);
+        $urls = [];
+        $paths = [];
+
+        foreach ($files as $file) {
+            if (! $file instanceof UploadedFile) {
+                continue;
+            }
+
+            $path = $file->store('products', 'public');
+
+            if ($path === false) {
+                throw new RuntimeException('Product gallery image could not be stored.');
+            }
+
+            $paths[] = $path;
+            $urls[] = '/storage/'.$path;
+        }
+
+        return [$urls, $paths];
+    }
+
+    /** @param list<string> $gallery */
+    private function galleryWithMainImage(?string $imageUrl, array $gallery): array
+    {
+        return array_values(array_unique(array_filter([
+            $imageUrl,
+            ...$gallery,
+        ], fn (?string $url): bool => is_string($url) && $url !== '')));
+    }
+
+    /** @param list<string> $previous @param list<string> $next */
+    private function deleteRemovedGalleryImages(array $previous, array $next): void
+    {
+        foreach (array_diff($previous, $next) as $url) {
+            $this->deleteManagedImage($url);
+        }
+    }
+
+    private function syncStock(string $productId, int $quantity): void
+    {
+        $exists = DB::table('inventory_stock')->where('product_id', $productId)->exists();
+
+        if ($exists) {
+            DB::table('inventory_stock')->where('product_id', $productId)->update([
+                'on_hand' => $quantity,
+                'reserved' => 0,
+                'version' => DB::raw('version + 1'),
+                'updated_at' => now(),
+            ]);
+
+            return;
+        }
+
+        DB::table('inventory_stock')->insert([
+                'product_id' => $productId,
+                'on_hand' => $quantity,
+                'reserved' => 0,
+                'version' => 1,
+                'created_at' => now(),
+                'updated_at' => now(),
+        ]);
+    }
+
+    /** @param list<array{id?: string, name: string, value: string, stock: int, lowStockThreshold: int}> $variations */
+    private function stockQuantity(int $fallback, array $variations): int
+    {
+        if ($variations === []) {
+            return $fallback;
+        }
+
+        return array_sum(array_map(fn (array $variation): int => max(0, (int) $variation['stock']), $variations));
     }
 }

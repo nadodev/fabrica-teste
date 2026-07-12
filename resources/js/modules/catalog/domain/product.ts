@@ -3,10 +3,22 @@ export type CatalogProduct = {
   sku: string;
   name: string;
   description: string;
+  category: string;
   priceAmount: number;
   priceCurrency: string;
   imageUrl: string | null;
+  galleryImages: string[];
+  variations: {
+    id: string;
+    name: string;
+    value: string;
+    stock: number;
+    lowStockThreshold: number;
+    purchasable: boolean;
+    lowStock: boolean;
+  }[];
   status: "draft" | "active" | "archived";
+  stockAvailable: number;
 };
 
 export const formatMoney = (amount: number, currency: string) =>

@@ -15,6 +15,11 @@ final readonly class DatabaseStockGateway implements StockGateway, StockManager
 {
     public function __construct(private ConnectionInterface $database) {}
 
+    public function tracked(string $productId): bool
+    {
+        return $this->database->table('inventory_stock')->where('product_id', $productId)->exists();
+    }
+
     public function available(string $productId): int
     {
         $stock = $this->database->table('inventory_stock')->where('product_id', $productId)->first();

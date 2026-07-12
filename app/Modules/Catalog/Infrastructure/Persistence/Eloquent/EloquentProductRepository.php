@@ -42,10 +42,13 @@ final class EloquentProductRepository implements ProductRepository
             'sku' => $product->sku->value,
             'name' => $product->name(),
             'description' => $product->description(),
+            'category' => $product->category(),
             'price_amount' => $product->price()->amount,
             'price_currency' => $product->price()->currency,
             'status' => $product->status()->value,
             'image_url' => $product->imageUrl(),
+            'gallery_images' => $product->galleryImages(),
+            'variations' => $product->variations(),
         ]);
     }
 
@@ -59,6 +62,9 @@ final class EloquentProductRepository implements ProductRepository
             new Money((int) $record->getAttribute('price_amount'), (string) $record->getAttribute('price_currency')),
             ProductStatus::from((string) $record->getAttribute('status')),
             $record->getAttribute('image_url'),
+            (string) ($record->getAttribute('category') ?? 'Uniformes'),
+            (array) ($record->getAttribute('gallery_images') ?? []),
+            (array) ($record->getAttribute('variations') ?? []),
         );
     }
 }

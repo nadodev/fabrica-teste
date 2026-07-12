@@ -13,3 +13,9 @@ Route::delete('/carrinho/itens/{product}', [CartController::class, 'destroy'])
     ->whereUuid('product')
     ->middleware(['throttle:commerce', 'idempotent'])
     ->name('carrinho.itens.destroy');
+Route::post('/carrinho/cupom', [CartController::class, 'applyCoupon'])
+    ->middleware(['throttle:commerce', 'idempotent'])
+    ->name('carrinho.cupom.apply');
+Route::delete('/carrinho/cupom', [CartController::class, 'removeCoupon'])
+    ->middleware(['throttle:commerce', 'idempotent'])
+    ->name('carrinho.cupom.remove');

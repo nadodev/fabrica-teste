@@ -6,6 +6,8 @@ namespace App\Modules\Inventory\Application\Port;
 
 interface StockGateway
 {
+    public function tracked(string $productId): bool;
+
     public function available(string $productId): int;
 
     public function reserve(string $reservationId, string $productId, int $quantity): void;

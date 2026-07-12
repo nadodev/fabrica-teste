@@ -13,7 +13,13 @@ import {
   Truck,
 } from "lucide-react";
 
-export function SiteFooter() {
+type SiteSettings = {
+  storeName: string;
+  logoUrl: string;
+};
+
+export function SiteFooter({ settings }: { settings: SiteSettings }) {
+
   return (
     <footer className="mt-16 bg-navy-deep text-white">
       <div className="border-b border-white/10 bg-navy">
@@ -28,7 +34,7 @@ export function SiteFooter() {
       <div className="mx-auto grid max-w-7xl gap-8 px-4 py-12 md:grid-cols-2 xl:grid-cols-[1.15fr_0.7fr_1.55fr_1fr]">
         <div>
           <div className="inline-flex rounded-lg bg-white p-2">
-            <img src="/logo.png" width={190} alt="Fábrica de Fardamentos" />
+            <img src={settings.logoUrl} width={190} alt={settings.storeName} />
           </div>
           <p className="mt-4 text-sm leading-7 text-white/70">
             Desde 2007, a Fábrica de Fardamentos produz uniformes profissionais com qualidade, conforto e durabilidade.

@@ -10,11 +10,14 @@ final readonly class CartItem
 {
     public function __construct(
         public string $productId,
+        public string $cartItemKey,
         public string $name,
         public Money $unitPrice,
         public int $quantity,
         public string $sku = '',
         public ?string $imageUrl = null,
+        public ?string $variationKey = null,
+        public ?string $variationLabel = null,
     ) {}
 
     public function subtotal(): Money

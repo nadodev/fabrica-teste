@@ -1,18 +1,38 @@
-import { Link } from "@inertiajs/react";
+import { Link, router } from "@inertiajs/react";
 import { ShoppingCart, Sparkles } from "lucide-react";
+import { useState } from "react";
 import fallbackImage from "@/assets/prod-polo.jpg";
+import { createIdempotencyKey } from "@/lib/idempotency-key";
 import type { Product } from "@/lib/store-data";
 import { formatBRL } from "@/lib/store-data";
 import type { CatalogProduct } from "@/modules/catalog/domain/product";
 import { formatMoney } from "@/modules/catalog/domain/product";
 
 export function ProductCard({ p }: { p: Product | CatalogProduct }) {
+  const [adding, setAdding] = useState(false);
   const persisted = "priceAmount" in p;
   const image = persisted ? (p.imageUrl ?? fallbackImage) : p.image;
   const price = persisted ? formatMoney(p.priceAmount, p.priceCurrency) : formatBRL(p.price);
   const segment = persisted ? p.sku : p.segment;
   const colors = persisted ? [] : p.colors;
   const personalizable = persisted ? false : p.personalizable;
+  const hasVariations = persisted && p.variations.length > 0;
+  const canQuickAdd = persisted && !hasVariations && p.stockAvailable > 0;
+
+  const addToCart = () => {
+    if (!canQuickAdd) return;
+
+    setAdding(true);
+    router.post(
+      "/carrinho/itens",
+      { productId: p.id, quantity: 1, variationId: null },
+      {
+        headers: { "Idempotency-Key": createIdempotencyKey() },
+        preserveScroll: true,
+        onFinish: () => setAdding(false),
+      },
+    );
+  };
 
   return (
     <div className="group flex flex-col overflow-hidden rounded-xl border border-border bg-white transition hover:-translate-y-1 hover:shadow-[var(--shadow-card)]">
@@ -42,9 +62,15 @@ export function ProductCard({ p }: { p: Product | CatalogProduct }) {
             Ver detalhes
           </Link>
         </div>
-        <Link href="/carrinho" className="mt-2 inline-flex items-center justify-center gap-2 rounded-md bg-yellow px-3 py-2 text-xs font-black text-navy transition hover:brightness-95">
-          <ShoppingCart className="h-3.5 w-3.5" /> Comprar
-        </Link>
+        {persisted && !hasVariations ? (
+          <button type="button" disabled={!canQuickAdd || adding} onClick={addToCart} className="mt-2 inline-flex items-center justify-center gap-2 rounded-md bg-yellow px-3 py-2 text-xs font-black text-navy transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60">
+            <ShoppingCart className="h-3.5 w-3.5" /> {adding ? "Adicionando..." : "Comprar"}
+          </button>
+        ) : (
+          <Link href={persisted ? `/produtos/${p.id}` : "/produtos"} className="mt-2 inline-flex items-center justify-center gap-2 rounded-md bg-yellow px-3 py-2 text-xs font-black text-navy transition hover:brightness-95">
+            <ShoppingCart className="h-3.5 w-3.5" /> {hasVariations ? "Escolher variacao" : "Comprar"}
+          </Link>
+        )}
       </div>
     </div>
   );

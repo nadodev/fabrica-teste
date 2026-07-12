@@ -25,21 +25,22 @@ final class Cart
         $cart = new self($id, $tokenHash, $currency, $version);
 
         foreach ($items as $item) {
-            $cart->items[$item->productId] = $item;
+            $cart->items[$item->cartItemKey] = $item;
         }
 
         return $cart;
     }
 
-    public function add(string $productId, string $name, Money $unitPrice, int $quantity = 1, string $sku = '', ?string $imageUrl = null): void
+    public function add(string $productId, string $name, Money $unitPrice, int $quantity = 1, string $sku = '', ?string $imageUrl = null, ?string $variationKey = null, ?string $variationLabel = null): void
     {
         if ($quantity < 1) {
             throw new InvalidArgumentException('Cart quantity must be at least one.');
         }
 
-        $current = $this->items[$productId] ?? null;
+        $cartItemKey = self::cartItemKey($productId, $variationKey);
+        $current = $this->items[$cartItemKey] ?? null;
         $newQuantity = $current === null ? $quantity : $current->quantity + $quantity;
-        $this->items[$productId] = new CartItem($productId, $name, $unitPrice, $newQuantity, $sku, $imageUrl);
+        $this->items[$cartItemKey] = new CartItem($productId, $cartItemKey, $name, $unitPrice, $newQuantity, $sku, $imageUrl, $variationKey, $variationLabel);
     }
 
     /** @return list<CartItem> */
@@ -51,6 +52,18 @@ final class Cart
     public function remove(string $productId): void
     {
         unset($this->items[$productId]);
+    }
+
+    public function quantityFor(string $productId, ?string $variationKey = null): int
+    {
+        $item = $this->items[self::cartItemKey($productId, $variationKey)] ?? null;
+
+        return $item?->quantity ?? 0;
+    }
+
+    public static function cartItemKey(string $productId, ?string $variationKey = null): string
+    {
+        return $variationKey === null || $variationKey === '' ? $productId : "{$productId}:{$variationKey}";
     }
 
     public function version(): int

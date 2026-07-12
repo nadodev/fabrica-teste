@@ -34,13 +34,13 @@ final readonly class CheckoutCart
             }
 
             $items = array_map(
-                fn ($item): OrderItem => new OrderItem($item->productId, $item->sku, $item->name, $item->unitPrice, $item->quantity),
+                fn ($item): OrderItem => new OrderItem($item->productId, $item->sku, $item->name, $item->unitPrice, $item->quantity, $item->variationKey, $item->variationLabel),
                 $cart->items(),
             );
             $order = Order::place($orderId, $this->orders->nextIdentity(), $cart->id, $items);
 
             foreach ($order->items() as $item) {
-                $reservationId = Uuid::uuid5(Uuid::NAMESPACE_URL, $order->id.':'.$item->productId)->toString();
+                $reservationId = Uuid::uuid5(Uuid::NAMESPACE_URL, $order->id.':'.$item->productId.':'.($item->variationKey ?? 'default'))->toString();
                 $this->stock->reserve($reservationId, $item->productId, $item->quantity);
             }
 

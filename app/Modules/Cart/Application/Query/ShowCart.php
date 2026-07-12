@@ -6,12 +6,14 @@ namespace App\Modules\Cart\Application\Query;
 
 use App\Modules\Cart\Application\DTO\CartView;
 use App\Modules\Cart\Domain\Port\CartRepository;
+use App\Support\CouponCalculator;
+use RuntimeException;
 
 final readonly class ShowCart
 {
-    public function __construct(private CartRepository $carts) {}
+    public function __construct(private CartRepository $carts, private CouponCalculator $coupons) {}
 
-    public function handle(?string $plainToken): CartView
+    public function handle(?string $plainToken, ?string $couponCode = null): CartView
     {
         if ($plainToken === null) {
             return CartView::empty();
@@ -19,6 +21,19 @@ final readonly class ShowCart
 
         $cart = $this->carts->findByTokenHash(hash('sha256', $plainToken));
 
-        return $cart === null ? CartView::empty() : CartView::fromDomain($cart);
+        if ($cart === null) {
+            return CartView::empty();
+        }
+
+        $coupon = null;
+        if (is_string($couponCode) && $couponCode !== '') {
+            try {
+                $coupon = $this->coupons->validDiscount($couponCode, $cart->total()->amount);
+            } catch (RuntimeException) {
+                $coupon = null;
+            }
+        }
+
+        return CartView::fromDomain($cart, $coupon);
     }
 }

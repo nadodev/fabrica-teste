@@ -14,6 +14,8 @@ final readonly class OrderItem
         public string $name,
         public Money $unitPrice,
         public int $quantity,
+        public ?string $variationKey = null,
+        public ?string $variationLabel = null,
     ) {}
 
     public function subtotal(): Money

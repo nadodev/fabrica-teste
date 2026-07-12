@@ -43,6 +43,8 @@ final readonly class DatabaseOrderRepository implements OrderRepository
                 (string) $item->name,
                 new Money((int) $item->unit_price_amount, (string) $item->price_currency),
                 (int) $item->quantity,
+                $item->variation_key === null ? null : (string) $item->variation_key,
+                $item->variation_label === null ? null : (string) $item->variation_label,
             ))->all();
 
         if ($items === []) {
@@ -72,6 +74,9 @@ final readonly class DatabaseOrderRepository implements OrderRepository
                 'number' => $order->number,
                 'cart_id' => $order->cartId,
                 'status' => $order->status()->value,
+                'subtotal_amount' => $order->total()->amount,
+                'discount_amount' => 0,
+                'coupon_code' => null,
                 'total_amount' => $order->total()->amount,
                 'currency' => $order->total()->currency,
                 'created_at' => now(),
@@ -83,6 +88,8 @@ final readonly class DatabaseOrderRepository implements OrderRepository
                 $this->database->table('ordering_order_items')->insert([
                     'order_id' => $order->id,
                     'product_id' => $item->productId,
+                    'variation_key' => $item->variationKey,
+                    'variation_label' => $item->variationLabel,
                     'sku' => $item->sku,
                     'name' => $item->name,
                     'unit_price_amount' => $item->unitPrice->amount,

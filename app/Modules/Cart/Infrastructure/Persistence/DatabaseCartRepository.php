@@ -43,6 +43,9 @@ final readonly class DatabaseCartRepository implements CartRepository
                     $this->database->table('cart_items')->insert([
                         'cart_id' => $cart->id,
                         'product_id' => $item->productId,
+                        'cart_item_key' => $item->cartItemKey,
+                        'variation_key' => $item->variationKey,
+                        'variation_label' => $item->variationLabel,
                         'sku' => $item->sku,
                         'name' => $item->name,
                         'unit_price_amount' => $item->unitPrice->amount,
@@ -118,11 +121,14 @@ final readonly class DatabaseCartRepository implements CartRepository
         $items = $this->database->table('cart_items')->where('cart_id', $row['id'])->orderBy('id')->get()
             ->map(fn (object $item): CartItem => new CartItem(
                 (string) $item->product_id,
+                (string) ($item->cart_item_key ?? $item->product_id),
                 (string) $item->name,
                 new Money((int) $item->unit_price_amount, (string) $item->price_currency),
                 (int) $item->quantity,
                 (string) $item->sku,
                 $item->image_url === null ? null : (string) $item->image_url,
+                $item->variation_key === null ? null : (string) $item->variation_key,
+                $item->variation_label === null ? null : (string) $item->variation_label,
             ))->all();
 
         return Cart::restore(

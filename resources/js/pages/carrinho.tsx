@@ -1,10 +1,12 @@
 import { Link, router } from "@inertiajs/react";
 import { ChevronRight, ShieldCheck, ShoppingBag, Trash2 } from "lucide-react";
 import fallbackImage from "@/assets/prod-polo.jpg";
+import { createIdempotencyKey } from "@/lib/idempotency-key";
 import { formatMoney } from "@/modules/catalog/domain/product";
 
 type CartItem = {
   productId: string;
+  cartItemKey: string;
   sku: string;
   name: string;
   unitPriceAmount: number;
@@ -12,6 +14,7 @@ type CartItem = {
   quantity: number;
   subtotalAmount: number;
   imageUrl: string | null;
+  variationLabel: string | null;
 };
 
 type Cart = {
@@ -21,9 +24,9 @@ type Cart = {
 };
 
 export default function CartPage({ cart }: { cart: Cart }) {
-  const remove = (productId: string) => {
-    router.delete(`/carrinho/itens/${productId}`, {
-      headers: { "Idempotency-Key": crypto.randomUUID() },
+  const remove = (cartItemKey: string) => {
+    router.delete(`/carrinho/itens/${encodeURIComponent(cartItemKey)}`, {
+      headers: { "Idempotency-Key": createIdempotencyKey() },
       preserveScroll: true,
     });
   };
@@ -52,7 +55,7 @@ export default function CartPage({ cart }: { cart: Cart }) {
         <main className="mx-auto grid max-w-7xl gap-8 px-4 py-10 lg:grid-cols-[1fr_360px]">
           <section className="space-y-4">
             {cart.items.map((item) => (
-              <article key={item.productId} className="grid gap-4 rounded-xl border border-border bg-white p-5 sm:grid-cols-[120px_1fr]">
+              <article key={item.cartItemKey} className="grid gap-4 rounded-xl border border-border bg-white p-5 sm:grid-cols-[120px_1fr]">
                 <img src={item.imageUrl ?? fallbackImage} alt={item.name} className="aspect-square w-full rounded-lg object-cover" />
                 <div>
                   <div className="flex items-start justify-between gap-3">
@@ -60,8 +63,9 @@ export default function CartPage({ cart }: { cart: Cart }) {
                       <div className="text-xs font-bold uppercase tracking-wider text-text-muted">{item.sku}</div>
                       <h2 className="font-display text-lg font-bold text-navy">{item.name}</h2>
                     </div>
-                    <button onClick={() => remove(item.productId)} aria-label={`Remover ${item.name}`} className="rounded-md p-2 text-text-muted hover:bg-bg-soft hover:text-red-700"><Trash2 className="h-4 w-4" /></button>
+                    <button onClick={() => remove(item.cartItemKey)} aria-label={`Remover ${item.name}`} className="rounded-md p-2 text-text-muted hover:bg-bg-soft hover:text-red-700"><Trash2 className="h-4 w-4" /></button>
                   </div>
+                  {item.variationLabel && <div className="mt-2 text-sm font-semibold text-navy">{item.variationLabel}</div>}
                   <div className="mt-5 flex items-end justify-between">
                     <div className="text-sm text-text-muted">{item.quantity} × {formatMoney(item.unitPriceAmount, item.priceCurrency)}</div>
                     <div className="font-display text-xl font-black text-navy">{formatMoney(item.subtotalAmount, item.priceCurrency)}</div>
@@ -78,7 +82,7 @@ export default function CartPage({ cart }: { cart: Cart }) {
               <strong className="font-display text-2xl text-navy">{formatMoney(cart.totalAmount, cart.currency)}</strong>
             </div>
             <p className="mt-2 text-xs leading-5 text-text-muted">Frete, disponibilidade e preços serão confirmados novamente no checkout.</p>
-            <button className="mt-5 w-full rounded-md bg-yellow py-3 font-black text-navy">Finalizar compra</button>
+            <Link href="/checkout" className="mt-5 block w-full rounded-md bg-yellow py-3 text-center font-black text-navy">Finalizar compra</Link>
             <Link href="/produtos" className="mt-3 block text-center text-sm font-semibold text-navy hover:underline">Continuar comprando</Link>
             <div className="mt-5 flex items-center gap-2 border-t border-border pt-4 text-xs text-text-muted"><ShieldCheck className="h-4 w-4 text-navy" /> Preços calculados com segurança no servidor</div>
           </aside>
