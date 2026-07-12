@@ -15,7 +15,9 @@ final class EloquentProductRepository implements ProductRepository
 {
     public function active(): array
     {
-        return ProductRecord::query()->where('status', ProductStatus::Active->value)->orderBy('name')->get()->map(fn (ProductRecord $record): Product => $this->toDomain($record))->all();
+        $products = ProductRecord::query()->where('status', ProductStatus::Active->value)->orderBy('name')->get()->map(fn (ProductRecord $record): Product => $this->toDomain($record))->all();
+
+        return array_values($products);
     }
 
     public function find(ProductId $id): ?Product

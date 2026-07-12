@@ -6,6 +6,11 @@ namespace App\Modules\Shared\Application\Port;
 
 interface TransactionManager
 {
-    /** @template T @param callable(): T $operation @return T */
+    /**
+     * @template T
+     *
+     * @param  callable(): T  $operation
+     * @return T
+     */
     public function run(callable $operation): mixed;
 }

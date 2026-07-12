@@ -21,7 +21,8 @@ final class Cart
         }
 
         $current = $this->items[$productId] ?? null;
-        $this->items[$productId] = new CartItem($productId, $name, $unitPrice, ($current?->quantity ?? 0) + $quantity);
+        $newQuantity = $current === null ? $quantity : $current->quantity + $quantity;
+        $this->items[$productId] = new CartItem($productId, $name, $unitPrice, $newQuantity);
     }
 
     /** @return list<CartItem> */
