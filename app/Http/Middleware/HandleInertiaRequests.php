@@ -40,6 +40,7 @@ class HandleInertiaRequests extends Middleware
             ...parent::share($request),
             'name' => config('app.name'),
             'siteSettings' => $this->siteSettings(),
+            'topbarNotification' => $this->topbarNotification(),
             'cartSummary' => $this->cartSummary($request),
             'auth' => [
                 'user' => $request->user(),
@@ -57,6 +58,33 @@ class HandleInertiaRequests extends Middleware
             'logoUrl' => (string) ($settings->logo_url ?? '/logo.png'),
             'primaryColor' => (string) ($settings->primary_color ?? '#123a6b'),
             'secondaryColor' => (string) ($settings->secondary_color ?? '#f5c542'),
+        ];
+    }
+
+    /** @return array{message: string, linkLabel: string|null, linkUrl: string|null}|null */
+    private function topbarNotification(): ?array
+    {
+        $now = now();
+        $notification = DB::table('site_topbar_notifications')
+            ->where('is_active', true)
+            ->where(function ($query) use ($now): void {
+                $query->whereNull('starts_at')->orWhere('starts_at', '<=', $now);
+            })
+            ->where(function ($query) use ($now): void {
+                $query->whereNull('ends_at')->orWhere('ends_at', '>=', $now);
+            })
+            ->orderBy('sort_order')
+            ->orderByDesc('created_at')
+            ->first();
+
+        if ($notification === null) {
+            return null;
+        }
+
+        return [
+            'message' => (string) $notification->message,
+            'linkLabel' => $notification->link_label === null ? null : (string) $notification->link_label,
+            'linkUrl' => $notification->link_url === null ? null : (string) $notification->link_url,
         ];
     }
 

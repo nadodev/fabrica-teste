@@ -18,11 +18,24 @@ type CartItem = {
 
 type Cart = {
   items: CartItem[];
+  subtotalAmount: number;
+  discountAmount: number;
   totalAmount: number;
   currency: string;
+  coupon: { code: string; description: string; discountAmount: number } | null;
 };
 
-export default function Checkout({ cart }: { cart: Cart }) {
+const emptyCart: Cart = {
+  items: [],
+  subtotalAmount: 0,
+  discountAmount: 0,
+  totalAmount: 0,
+  currency: "BRL",
+  coupon: null,
+};
+
+export default function Checkout({ cart = emptyCart }: { cart?: Cart }) {
+  const safeCart = { ...emptyCart, ...cart, items: Array.isArray(cart?.items) ? cart.items : [] };
   const form = useForm({
     customerName: "",
     customerEmail: "",
@@ -89,7 +102,7 @@ export default function Checkout({ cart }: { cart: Cart }) {
         <aside className="h-fit rounded-xl border border-border bg-white p-5 shadow-[var(--shadow-soft)] lg:sticky lg:top-32">
           <h2 className="font-display text-lg font-black text-navy">Resumo</h2>
           <div className="mt-4 space-y-4">
-            {cart.items.map((item) => (
+            {safeCart.items.map((item) => (
               <div key={item.cartItemKey} className="flex gap-3 border-b border-border pb-4 last:border-0">
                 <div className="flex-1">
                   <div className="font-bold text-navy">{item.name}</div>
@@ -100,9 +113,21 @@ export default function Checkout({ cart }: { cart: Cart }) {
               </div>
             ))}
           </div>
+          <div className="mt-5 space-y-3 border-t border-border pt-5">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-text-muted">Subtotal</span>
+              <strong className="text-navy">{formatMoney(safeCart.subtotalAmount, safeCart.currency)}</strong>
+            </div>
+            {safeCart.discountAmount > 0 && (
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-text-muted">Desconto {safeCart.coupon ? `(${safeCart.coupon.code})` : ""}</span>
+                <strong className="text-green-700">- {formatMoney(safeCart.discountAmount, safeCart.currency)}</strong>
+              </div>
+            )}
+          </div>
           <div className="mt-5 flex items-end justify-between border-t border-border pt-5">
             <span className="text-text-muted">Total</span>
-            <strong className="font-display text-2xl text-navy">{formatMoney(cart.totalAmount, cart.currency)}</strong>
+            <strong className="font-display text-2xl text-navy">{formatMoney(safeCart.totalAmount, safeCart.currency)}</strong>
           </div>
           <div className="mt-5 flex items-center gap-2 rounded-lg bg-bg-soft p-3 text-xs text-text-muted">
             <ShieldCheck className="h-4 w-4 text-navy" /> Pedido sem pagamento online nesta etapa.

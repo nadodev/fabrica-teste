@@ -5,15 +5,16 @@ import { useMemo, useState } from "react";
 import type { CatalogProduct } from "@/modules/catalog/domain/product";
 import { CatalogProductCard } from "@/modules/catalog/ui/catalog-product-card";
 
-export default function ProductsPage({ products }: { products: CatalogProduct[] }) {
+export default function ProductsPage({ products = [] }: { products?: CatalogProduct[] }) {
+  const safeProducts = Array.isArray(products) ? products : [];
   const initialSearch = typeof window === "undefined" ? "" : new URLSearchParams(window.location.search).get("busca") ?? "";
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState(initialSearch);
   const [view, setView] = useState<"grid" | "list">("grid");
 
-  const categories = useMemo(() => Array.from(new Set(products.map((product) => product.category))).filter(Boolean), [products]);
+  const categories = useMemo(() => Array.from(new Set(safeProducts.map((product) => product.category))).filter(Boolean), [safeProducts]);
   const normalizedSearch = searchTerm.trim().toLowerCase();
-  const filtered = products.filter((product) => {
+  const filtered = safeProducts.filter((product) => {
     const matchesCategory = activeCategory === null || product.category === activeCategory;
     const matchesSearch = normalizedSearch === "" || [
       product.name,

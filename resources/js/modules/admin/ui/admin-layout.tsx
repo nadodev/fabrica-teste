@@ -1,5 +1,5 @@
 import { Link, router, usePage } from "@inertiajs/react";
-import { Boxes, ExternalLink, Image, LayoutDashboard, LogOut, MapPin, PackagePlus, Settings, Tags, Text } from "lucide-react";
+import { BadgePercent, Bell, Boxes, ExternalLink, Image, LayoutDashboard, LogOut, MapPin, PackagePlus, Settings, Tags, Text } from "lucide-react";
 import type { ReactNode } from "react";
 
 export function AdminLayout({ title, children }: { title: string; children: ReactNode }) {
@@ -15,8 +15,10 @@ export function AdminLayout({ title, children }: { title: string; children: Reac
           <Link href="/admin" className="flex items-center gap-3 rounded-lg bg-white/10 px-3 py-2.5 text-sm font-bold"><LayoutDashboard className="h-4 w-4" /> Dashboard</Link>
           <Link href="/admin/produtos" className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold hover:bg-white/10"><Boxes className="h-4 w-4" /> Produtos</Link>
           <Link href="/admin/produtos/novo" className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold hover:bg-white/10"><PackagePlus className="h-4 w-4" /> Novo produto</Link>
+          <Link href="/admin/cupons" className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold hover:bg-white/10"><BadgePercent className="h-4 w-4" /> Cupons</Link>
           <Link href="/admin/conteudo/categorias" className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold hover:bg-white/10"><Tags className="h-4 w-4" /> Categorias</Link>
           <Link href="/admin/conteudo/banners" className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold hover:bg-white/10"><Image className="h-4 w-4" /> Banners</Link>
+          <Link href="/admin/conteudo/notificacoes" className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold hover:bg-white/10"><Bell className="h-4 w-4" /> Notificacoes</Link>
           <Link href="/admin/conteudo/lojas" className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold hover:bg-white/10"><MapPin className="h-4 w-4" /> Lojas</Link>
           <Link href="/admin/conteudo/historia" className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold hover:bg-white/10"><Text className="h-4 w-4" /> Nossa historia</Link>
           <Link href="/admin/configuracoes" className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold hover:bg-white/10"><Settings className="h-4 w-4" /> Configuracoes</Link>

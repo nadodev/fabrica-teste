@@ -8,7 +8,8 @@ import { formatMoney } from "@/modules/catalog/domain/product";
 
 export function CatalogProductCard({ product }: { product: CatalogProduct }) {
   const [adding, setAdding] = useState(false);
-  const hasVariations = product.variations.length > 0;
+  const variations = product.variations ?? [];
+  const hasVariations = variations.length > 0;
   const canQuickAdd = !hasVariations && product.stockAvailable > 0;
 
   const addToCart = () => {

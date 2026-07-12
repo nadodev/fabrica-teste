@@ -7,19 +7,20 @@ import type { CatalogProduct } from "@/modules/catalog/domain/product";
 import { formatMoney } from "@/modules/catalog/domain/product";
 
 export default function ProdutoDetalhe({ product }: { product: CatalogProduct }) {
+  const variations = product.variations ?? [];
   const gallery = useMemo(() => {
     const images = [product.imageUrl, ...(product.galleryImages ?? [])].filter(Boolean) as string[];
     return Array.from(new Set(images.length > 0 ? images : [fallbackImage]));
   }, [product.galleryImages, product.imageUrl]);
-  const firstPurchasableVariation = product.variations.find((variation) => variation.purchasable);
+  const firstPurchasableVariation = variations.find((variation) => variation.purchasable);
   const [selectedImage, setSelectedImage] = useState(gallery[0]);
   const [quantity, setQuantity] = useState(1);
   const [adding, setAdding] = useState(false);
   const [selectedVariationId, setSelectedVariationId] = useState(firstPurchasableVariation?.id ?? "");
 
-  const selectedVariation = product.variations.find((variation) => variation.id === selectedVariationId) ?? null;
+  const selectedVariation = variations.find((variation) => variation.id === selectedVariationId) ?? null;
   const availableStock = selectedVariation ? selectedVariation.stock : product.stockAvailable;
-  const canBuy = product.variations.length > 0 ? Boolean(selectedVariation?.purchasable) : product.stockAvailable > 0;
+  const canBuy = variations.length > 0 ? Boolean(selectedVariation?.purchasable) : product.stockAvailable > 0;
   const safeQuantity = Math.min(quantity, Math.max(availableStock, 1));
 
   const addToCart = () => {
@@ -80,11 +81,11 @@ export default function ProdutoDetalhe({ product }: { product: CatalogProduct })
             <div className="font-display text-4xl font-black text-navy">{formatMoney(product.priceAmount, product.priceCurrency)}</div>
           </div>
 
-          {product.variations.length > 0 && (
+          {variations.length > 0 && (
             <div className="mt-6">
               <div className="mb-2 text-sm font-bold text-navy">Variacoes</div>
               <div className="grid gap-2 sm:grid-cols-2">
-                {product.variations.map((variation) => (
+                {variations.map((variation) => (
                   <button
                     key={variation.id}
                     type="button"

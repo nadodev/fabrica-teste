@@ -24,6 +24,12 @@ type CartSummary = {
     itemsCount: number;
 };
 
+type TopbarNotification = {
+    message: string;
+    linkLabel: string | null;
+    linkUrl: string | null;
+};
+
 function shadeHex(hex: string, percent: number) {
     const clean = /^#[0-9a-fA-F]{6}$/.test(hex) ? hex.slice(1) : '123a6b';
     const num = Number.parseInt(clean, 16);
@@ -49,6 +55,7 @@ createInertiaApp({
         const isBackOffice = props.initialPage.component.startsWith('admin/') || props.initialPage.component.startsWith('auth/');
         const settings = (props.initialPage.props.siteSettings as SiteSettings | undefined) ?? defaultSiteSettings;
         const cartSummary = props.initialPage.props.cartSummary as CartSummary | undefined;
+        const topbarNotification = props.initialPage.props.topbarNotification as TopbarNotification | null | undefined;
         const primary = settings?.primaryColor ?? '#123a6b';
         const secondary = settings?.secondaryColor ?? '#f5c542';
         const themeStyle = {
@@ -61,7 +68,7 @@ createInertiaApp({
 
         createRoot(el).render(
             <div className="flex min-h-screen flex-col bg-white" style={themeStyle}>
-                {!isBackOffice && <SiteHeader settings={settings} initialCartItemsCount={cartSummary?.itemsCount ?? 0} />}
+                {!isBackOffice && <SiteHeader settings={settings} initialCartItemsCount={cartSummary?.itemsCount ?? 0} notification={topbarNotification ?? null} />}
                 <main className="flex-1">
                     <App {...props} />
                 </main>

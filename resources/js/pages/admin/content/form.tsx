@@ -21,6 +21,14 @@ const fieldsByType: Record<string, { name: string; label: string; textarea?: boo
     { name: "link_url", label: "Link" },
     { name: "sort_order", label: "Ordem" },
   ],
+  notificacoes: [
+    { name: "message", label: "Mensagem" },
+    { name: "link_label", label: "Texto do link" },
+    { name: "link_url", label: "Link" },
+    { name: "starts_at", label: "Inicio" },
+    { name: "ends_at", label: "Fim" },
+    { name: "sort_order", label: "Ordem" },
+  ],
   lojas: [
     { name: "type", label: "Tipo" },
     { name: "city", label: "Cidade/Unidade" },

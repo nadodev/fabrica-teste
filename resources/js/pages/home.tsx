@@ -32,6 +32,7 @@ export default function Index({ banners = [], categories = [], products: catalog
 }
 
 function Hero({ banners }: { banners: Banner[] }) {
+  const safeBanners = Array.isArray(banners) ? banners : [];
   const fallback = [{
     id: "default-store-banner",
     eyebrow: "Destaque da loja",
@@ -41,7 +42,7 @@ function Hero({ banners }: { banners: Banner[] }) {
     link_url: "/produtos",
     image_url: null,
   }];
-  const slides = banners.length > 0 ? banners : fallback;
+  const slides = safeBanners.length > 0 ? safeBanners : fallback;
   const [activeIndex, setActiveIndex] = useState(0);
   const active = slides[activeIndex] ?? slides[0];
 
@@ -79,6 +80,7 @@ function Hero({ banners }: { banners: Banner[] }) {
 }
 
 function FeaturedProducts({ products: catalogProducts }: { products: CatalogProduct[] }) {
+  const safeCatalogProducts = Array.isArray(catalogProducts) ? catalogProducts : [];
   return (
     <section className="bg-white py-8 md:py-12">
       <div className="mx-auto max-w-7xl px-4">
@@ -87,8 +89,8 @@ function FeaturedProducts({ products: catalogProducts }: { products: CatalogProd
           <Link href="/produtos" className="inline-flex shrink-0 items-center gap-2 rounded-md border border-navy px-3 py-2 text-xs font-black text-navy transition hover:bg-navy hover:text-white md:px-4 md:text-sm">Ver todos <ArrowRight className="h-4 w-4" /></Link>
         </div>
         <div className="mt-6 grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-4">
-          {catalogProducts.length > 0
-            ? catalogProducts.slice(0, 4).map((product) => <CatalogProductCard key={product.id} product={product} />)
+          {safeCatalogProducts.length > 0
+            ? safeCatalogProducts.slice(0, 4).map((product) => <CatalogProductCard key={product.id} product={product} />)
             : products.slice(0, 4).map((p) => <ProductCard key={p.id} p={p} />)}
         </div>
       </div>
@@ -97,13 +99,14 @@ function FeaturedProducts({ products: catalogProducts }: { products: CatalogProd
 }
 
 function ProductLines({ categories }: { categories: Category[] }) {
+  const safeCategories = Array.isArray(categories) ? categories : [];
   const fallback = [
     { id: "empresas", name: "Empresas", description: "Camisas, polos, calcas e conjuntos corporativos.", image_url: catEmpresa, link_url: "/empresas" },
     { id: "escolas", name: "Escolas", description: "Uniformes confortaveis e resistentes para a rotina escolar.", image_url: catEscola, link_url: "/escolas" },
     { id: "profissional", name: "Profissional", description: "Cozinha, limpeza, industria, saude e atendimento.", image_url: catProf, link_url: "/produtos" },
     { id: "personalizados", name: "Personalizados", description: "Bordado, estampa, logotipo e identidade visual.", image_url: catPerso, link_url: "/personalizados" },
   ];
-  const lines = categories.length > 0 ? categories : fallback;
+  const lines = safeCategories.length > 0 ? safeCategories : fallback;
 
   return (
     <section className="mx-auto max-w-7xl px-4 py-12 md:py-14">
@@ -134,11 +137,12 @@ function CommerceBenefits() {
 }
 
 function Stores({ stores }: { stores: StoreItem[] }) {
+  const safeStores = Array.isArray(stores) ? stores : [];
   const fallback = [
     { id: "pe", type: "Matriz", city: "Pernambuco", address: "Av. Doutor Julio Maranhao, 7, Guararapes, Jaboatao dos Guararapes - PE", phone: "(81) 97910-6667 / (81) 3074-2933", hours: "Segunda a Sexta, 7h as 17h" },
     { id: "sp", type: "Filial", city: "Sao Paulo", address: "Estrada do Rufino, 850, Serraria, Diadema - SP", phone: "(11) 94211-0729 / (11) 4057-3202", hours: "Segunda a Sexta, 8h as 18h / Sabado 8h as 13h" },
   ];
-  const rows = stores.length > 0 ? stores : fallback;
+  const rows = safeStores.length > 0 ? safeStores : fallback;
   return (
     <section id="lojas" className="bg-bg-soft py-12 md:py-14"><div className="mx-auto max-w-7xl px-4"><SectionHeading eyebrow="Nossas lojas" title="Retire, visite ou fale com uma unidade" /><div className="mt-8 grid gap-5 lg:grid-cols-2">{rows.map((store) => <article key={store.id} className="overflow-hidden rounded-xl border border-border bg-white shadow-[var(--shadow-soft)]"><div className="flex items-center justify-between bg-navy px-5 py-4 text-white"><div><div className="text-xs font-black uppercase tracking-[0.18em] text-yellow">{store.type}</div><h3 className="mt-1 font-display text-2xl font-black">{store.city}</h3></div><Store className="h-8 w-8 text-yellow" /></div><div className="space-y-4 p-5 text-sm text-text-muted"><Info icon={MapPin} label="Endereco" value={store.address} /><Info icon={Phone} label="Telefone" value={store.phone} /><Info icon={Timer} label="Horario" value={store.hours} /></div></article>)}</div></div></section>
   );

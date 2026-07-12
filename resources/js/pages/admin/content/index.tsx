@@ -9,12 +9,14 @@ type Item = {
   title?: string;
   city?: string;
   type?: string;
+  message?: string;
   image_url?: string | null;
   is_active: boolean;
   sort_order?: number;
 };
 
-export default function ContentIndex({ type, title, items }: { type: string; title: string; items: Item[] }) {
+export default function ContentIndex({ type, title, items = [] }: { type: string; title: string; items?: Item[] }) {
+  const safeItems = Array.isArray(items) ? items : [];
   const remove = (item: Item) => {
     if (window.confirm(`Remover ${label(item)}?`)) {
       router.delete(`/admin/conteudo/${type}/${item.id}`, { headers: { "Idempotency-Key": createIdempotencyKey() }, preserveScroll: true });
@@ -25,17 +27,17 @@ export default function ContentIndex({ type, title, items }: { type: string; tit
     <AdminLayout title={title}>
       <Head title={title} />
       <div className="mb-5 flex items-center justify-between gap-3">
-        <p className="text-sm text-text-muted">{items.length} registro(s)</p>
+        <p className="text-sm text-text-muted">{safeItems.length} registro(s)</p>
         <Link href={`/admin/conteudo/${type}/novo`} className="inline-flex items-center gap-2 rounded-lg bg-yellow px-4 py-2.5 text-sm font-black text-navy">
           <Plus className="h-4 w-4" /> Novo
         </Link>
       </div>
       <div className="overflow-hidden rounded-xl border border-border bg-white">
-        {items.length === 0 ? (
+        {safeItems.length === 0 ? (
           <div className="p-12 text-center text-text-muted">Nenhum registro cadastrado.</div>
         ) : (
           <div className="divide-y divide-border">
-            {items.map((item) => (
+            {safeItems.map((item) => (
               <div key={item.id} className="flex items-center gap-4 p-4">
                 {item.image_url && <img src={item.image_url} alt="" className="h-14 w-20 rounded-lg object-cover" />}
                 <div className="min-w-0 flex-1">
@@ -58,5 +60,5 @@ export default function ContentIndex({ type, title, items }: { type: string; tit
 }
 
 function label(item: Item) {
-  return item.name ?? item.title ?? item.city ?? item.type ?? "Registro";
+  return item.name ?? item.title ?? item.city ?? item.type ?? item.message ?? "Registro";
 }

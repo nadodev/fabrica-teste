@@ -37,7 +37,13 @@ type CartSummary = {
   itemsCount?: number;
 };
 
-export function SiteHeader({ settings, initialCartItemsCount }: { settings: SiteSettings; initialCartItemsCount: number }) {
+type TopbarNotification = {
+  message: string;
+  linkLabel: string | null;
+  linkUrl: string | null;
+};
+
+export function SiteHeader({ settings, initialCartItemsCount, notification }: { settings: SiteSettings; initialCartItemsCount: number; notification: TopbarNotification | null }) {
   const [cartItemsCount, setCartItemsCount] = useState(initialCartItemsCount);
   const [searchTerm, setSearchTerm] = useState("");
   const cartBadge = cartItemsCount > 99 ? "99+" : String(cartItemsCount);
@@ -62,6 +68,18 @@ export function SiteHeader({ settings, initialCartItemsCount }: { settings: Site
 
   return (
     <header className="sticky top-0 z-40 bg-white shadow-[0_8px_24px_-22px_var(--color-navy)]">
+      {notification && (
+        <div className="bg-yellow text-navy">
+          <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-center gap-2 px-3 py-2 text-center text-xs font-black sm:px-4">
+            <span>{notification.message}</span>
+            {notification.linkLabel && notification.linkUrl && (
+              <Link href={notification.linkUrl} className="underline decoration-2 underline-offset-2">
+                {notification.linkLabel}
+              </Link>
+            )}
+          </div>
+        </div>
+      )}
       <div className="bg-navy text-white">
         <div className="mx-auto flex max-w-7xl items-center justify-center gap-2 px-3 py-2 text-[11px] font-bold sm:justify-between sm:px-4 sm:text-xs">
           <div className="flex min-w-0 items-center gap-3">
