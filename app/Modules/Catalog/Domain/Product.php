@@ -21,7 +21,22 @@ final class Product
         $name = trim($name);
         if ($name === '' || mb_strlen($name) > 160) {
             throw new InvalidArgumentException('Product name must contain between 1 and 160 characters.');
-        } $this->name = $name;
+        }
+
+        $this->name = $name;
+    }
+
+    public function updateDetails(string $name, string $description, Money $price, ProductStatus $status, ?string $imageUrl): void
+    {
+        if (mb_strlen($description) > 5000) {
+            throw new InvalidArgumentException('Product description cannot exceed 5000 characters.');
+        }
+
+        $this->rename($name);
+        $this->description = trim($description);
+        $this->price = $price;
+        $this->status = $status;
+        $this->imageUrl = $imageUrl;
     }
 
     public function activate(): void

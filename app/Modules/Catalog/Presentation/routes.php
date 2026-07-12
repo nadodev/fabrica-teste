@@ -15,7 +15,10 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
     Route::redirect('/', '/admin/produtos')->name('dashboard');
     Route::get('/produtos', [AdminProductController::class, 'index'])->name('products.index');
     Route::get('/produtos/novo', [AdminProductController::class, 'create'])->name('products.create');
+    Route::get('/produtos/{product}/editar', [AdminProductController::class, 'edit'])->whereUuid('product')->name('products.edit');
     Route::post('/produtos', [AdminProductController::class, 'store'])
         ->middleware(['throttle:commerce', 'idempotent'])
         ->name('products.store');
+    Route::put('/produtos/{product}', [AdminProductController::class, 'update'])->whereUuid('product')->middleware(['throttle:commerce', 'idempotent'])->name('products.update');
+    Route::delete('/produtos/{product}', [AdminProductController::class, 'destroy'])->whereUuid('product')->middleware(['throttle:commerce', 'idempotent'])->name('products.destroy');
 });
