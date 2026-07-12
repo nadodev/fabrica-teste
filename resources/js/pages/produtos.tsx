@@ -2,8 +2,8 @@ import { Link } from "@inertiajs/react";
 import { LayoutGrid, List, ChevronRight } from "lucide-react";
 import { useState } from "react";
 import type { ReactNode } from "react";
-import { ProductCard } from "@/components/product-card";
 import type { CatalogProduct } from "@/modules/catalog/domain/product";
+import { CatalogProductCard } from "@/modules/catalog/ui/catalog-product-card";
 
 const segments = ["Empresarial", "Escolar", "Profissional", "Industrial"];
 const types = ["Camisas", "Camisas Polo", "Calças", "Jalecos", "Aventais", "Conjuntos"];
@@ -108,7 +108,7 @@ export default function ProductsPage({ products }: { products: CatalogProduct[] 
             </div>
           </div>
           <div className={view === "grid" ? "grid grid-cols-2 gap-3 sm:gap-6 xl:grid-cols-3" : "space-y-4"}>
-            {filtered.map((p) => <ProductCard key={p.id} p={p} />)}
+            {filtered.map((product) => <CatalogProductCard key={product.id} product={product} />)}
           </div>
         </div>
       </div>
