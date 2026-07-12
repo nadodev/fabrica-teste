@@ -1,23 +1,20 @@
-import type { ReactNode } from 'react';
 import { Link } from "@inertiajs/react";
-import { useMemo, useState } from "react";
 import { LayoutGrid, List, ChevronRight } from "lucide-react";
-import { products } from "@/lib/store-data";
+import { useState } from "react";
+import type { ReactNode } from "react";
 import { ProductCard } from "@/components/product-card";
+import type { CatalogProduct } from "@/modules/catalog/domain/product";
 
 const segments = ["Empresarial", "Escolar", "Profissional", "Industrial"];
 const types = ["Camisas", "Camisas Polo", "Calças", "Jalecos", "Aventais", "Conjuntos"];
 const publics = ["Masculino", "Feminino", "Infantil", "Unissex"];
 const sizes = ["PP", "P", "M", "G", "GG", "XGG"];
 
-export default function ProductsPage() {
+export default function ProductsPage({ products }: { products: CatalogProduct[] }) {
   const [activeSeg, setActiveSeg] = useState<string | null>(null);
   const [view, setView] = useState<"grid" | "list">("grid");
 
-  const filtered = useMemo(() => {
-    if (!activeSeg) return products;
-    return products.filter((p) => p.segment === activeSeg);
-  }, [activeSeg]);
+  const filtered = products;
 
   return (
     <div>
