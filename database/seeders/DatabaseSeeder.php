@@ -17,11 +17,18 @@ class DatabaseSeeder extends Seeder
     {
         $this->call(CatalogSeeder::class);
 
-        // User::factory(10)->create();
+        $password = env('ADMIN_PASSWORD');
 
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-        ]);
+        if (! app()->isProduction() || is_string($password)) {
+            User::query()->updateOrCreate(
+                ['email' => env('ADMIN_EMAIL', 'admin@example.com')],
+                [
+                    'name' => env('ADMIN_NAME', 'Administrador'),
+                    'password' => $password ?: 'password',
+                    'is_admin' => true,
+                    'email_verified_at' => now(),
+                ],
+            );
+        }
     }
 }
