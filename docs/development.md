@@ -58,6 +58,35 @@ O `CatalogSeeder` cria produtos demonstrativos idempotentes. Em produção, seed
 
 O mesmo fluxo se aplica a `ShippingQuoteGateway` e `StockGateway`.
 
+## Idempotência
+
+Endpoints mutáveis críticos devem usar os middlewares de idempotência e rate limit:
+
+```php
+Route::post('/checkout', CheckoutController::class)
+    ->middleware(['throttle:commerce', 'idempotent']);
+```
+
+O cliente deve gerar uma chave nova por intenção comercial e repetir a mesma chave somente ao reenviar a mesma operação:
+
+```http
+Idempotency-Key: 0190f566-c399-79e3-a553-7e5fb8d83419
+```
+
+Reutilizar a chave com outro payload retorna `409 Conflict`. Respostas `5xx` liberam a chave para retry; respostas concluídas ficam disponíveis para replay por 24 horas.
+
+## Concorrência de estoque
+
+O adaptador de estoque utiliza transações e `lockForUpdate`. Testes rápidos rodam em SQLite, mas a garantia de concorrência deve ser validada no mesmo MySQL/InnoDB usado em produção:
+
+1. cadastrar uma unidade disponível;
+2. disparar duas reservas simultâneas com chaves diferentes;
+3. confirmar que apenas uma reserva foi aceita;
+4. confirmar `reserved <= on_hand` e ausência de saldo negativo;
+5. repetir após deadlock/retry.
+
+Não faça chamadas de gateway durante a transação do banco.
+
 ## Commits
 
 O histórico segue Conventional Commits:
@@ -82,4 +111,3 @@ Configure o domínio com PHP 8.3 ou superior e execute:
 ```
 
 Compile os assets antes do envio ou no ambiente que possuir Node.js. O diretório público do domínio deve apontar para `public/`.
-
