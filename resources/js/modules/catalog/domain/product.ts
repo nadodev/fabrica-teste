@@ -6,6 +6,7 @@ export type CatalogProduct = {
   priceAmount: number;
   priceCurrency: string;
   imageUrl: string | null;
+  status: "draft" | "active" | "archived";
 };
 
 export const formatMoney = (amount: number, currency: string) =>

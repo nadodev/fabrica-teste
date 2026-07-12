@@ -17,13 +17,13 @@ class DatabaseSeeder extends Seeder
     {
         $this->call(CatalogSeeder::class);
 
-        $password = env('ADMIN_PASSWORD');
+        $password = config('admin.password');
 
         if (! app()->isProduction() || is_string($password)) {
             User::query()->updateOrCreate(
-                ['email' => env('ADMIN_EMAIL', 'admin@example.com')],
+                ['email' => config('admin.email')],
                 [
-                    'name' => env('ADMIN_NAME', 'Administrador'),
+                    'name' => config('admin.name'),
                     'password' => $password ?: 'password',
                     'is_admin' => true,
                     'email_verified_at' => now(),

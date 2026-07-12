@@ -13,6 +13,15 @@ use App\Modules\Shared\Domain\ValueObject\Money;
 
 final class EloquentProductRepository implements ProductRepository
 {
+    public function all(): array
+    {
+        $products = ProductRecord::query()->orderByDesc('created_at')->get()
+            ->map(fn (ProductRecord $record): Product => $this->toDomain($record))
+            ->all();
+
+        return array_values($products);
+    }
+
     public function active(): array
     {
         $products = ProductRecord::query()->where('status', ProductStatus::Active->value)->orderBy('name')->get()->map(fn (ProductRecord $record): Product => $this->toDomain($record))->all();

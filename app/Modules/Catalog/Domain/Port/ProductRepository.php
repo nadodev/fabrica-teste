@@ -10,6 +10,9 @@ use App\Modules\Catalog\Domain\ValueObject\ProductId;
 interface ProductRepository
 {
     /** @return list<Product> */
+    public function all(): array;
+
+    /** @return list<Product> */
     public function active(): array;
 
     public function find(ProductId $id): ?Product;

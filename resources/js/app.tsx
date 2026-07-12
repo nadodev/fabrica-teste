@@ -13,16 +13,19 @@ createInertiaApp({
             './pages/**/*.tsx',
             { eager: true },
         );
+
         return pages[`./pages/${name}.tsx`];
     },
     setup({ el, App, props }) {
+        const isBackOffice = props.initialPage.component.startsWith('admin/') || props.initialPage.component.startsWith('auth/');
+
         createRoot(el).render(
             <div className="flex min-h-screen flex-col bg-white">
-                <SiteHeader />
+                {!isBackOffice && <SiteHeader />}
                 <main className="flex-1">
                     <App {...props} />
                 </main>
-                <SiteFooter />
+                {!isBackOffice && <SiteFooter />}
             </div>,
         );
     },

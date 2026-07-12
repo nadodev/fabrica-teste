@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\AddSecurityHeaders;
+use App\Http\Middleware\EnsureUserIsAdmin;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Modules\Shared\Presentation\Http\Middleware\EnsureIdempotency;
 use Illuminate\Foundation\Application;
@@ -16,7 +17,12 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->alias(['idempotent' => EnsureIdempotency::class]);
+        $middleware->redirectGuestsTo(fn (): string => route('admin.login'));
+
+        $middleware->alias([
+            'admin' => EnsureUserIsAdmin::class,
+            'idempotent' => EnsureIdempotency::class,
+        ]);
 
         $middleware->web(append: [
             AddSecurityHeaders::class,
