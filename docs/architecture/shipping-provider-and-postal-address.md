@@ -13,3 +13,5 @@ A busca postal passa pela porta `PostalAddressLookup`. O adaptador ViaCEP execut
 ## Consequencias
 
 O frontend nao depende de CORS nem conhece provedores ou credenciais. O banco nao guarda mais o token e o painel recebe somente um indicador booleano de configuracao. Uma futura troca do ViaCEP exige somente outro adaptador. A renovacao OAuth do Melhor Envio continua sendo uma responsabilidade operacional separada.
+
+O diagnostico operacional e feito por `shipping:diagnose`. Ele le a mesma configuracao e o mesmo registro usados pelo adaptador, mas retorna somente estados booleanos e nunca o token. Falta de token e falta de CEP produzem mensagens distintas; o painel impede ativacao sem qualquer um deles.

@@ -118,6 +118,51 @@ it('requires an environment token before enabling Melhor Envio', function () {
         ->assertSessionHasErrors('isEnabled');
 });
 
+it('requires an origin postal code before enabling Melhor Envio', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+    config()->set('services.melhor_envio.token', 'environment-token');
+
+    $this->actingAs($admin)->post(route('admin.shipping.update'), [
+        'isEnabled' => true,
+        'environment' => 'production',
+        'originZip' => '',
+        'options' => [],
+    ], ['Idempotency-Key' => 'shipping-missing-origin'])
+        ->assertSessionHasErrors('originZip');
+});
+
+it('reports missing Melhor Envio settings separately', function () {
+    DB::table('shipping_settings')->where('id', 1)->update([
+        'is_enabled' => true,
+        'environment' => 'production',
+        'origin_zip' => '',
+    ]);
+    config()->set('services.melhor_envio.token', '');
+
+    expect(fn () => app(MelhorEnvioClient::class)->quote('01001000', shippingCartView()))
+        ->toThrow(RuntimeException::class, 'MELHOR_ENVIO_TOKEN nao foi carregado');
+
+    config()->set('services.melhor_envio.token', 'environment-token');
+
+    expect(fn () => app(MelhorEnvioClient::class)->quote('01001000', shippingCartView()))
+        ->toThrow(RuntimeException::class, 'O CEP de origem nao esta salvo');
+});
+
+it('diagnoses Melhor Envio readiness without exposing the token', function () {
+    config()->set('services.melhor_envio.token', 'secret-environment-token');
+    DB::table('shipping_settings')->where('id', 1)->update([
+        'is_enabled' => true,
+        'environment' => 'production',
+        'origin_zip' => '89600000',
+    ]);
+
+    $this->artisan('shipping:diagnose')
+        ->expectsOutputToContain('MELHOR_ENVIO_TOKEN: CONFIGURADO')
+        ->expectsOutputToContain('CEP de origem: CONFIGURADO')
+        ->doesntExpectOutputToContain('secret-environment-token')
+        ->assertSuccessful();
+});
+
 it('saves shipping settings without accepting a database token', function () {
     $admin = User::factory()->create(['is_admin' => true]);
     config()->set('services.melhor_envio.token', 'environment-token');

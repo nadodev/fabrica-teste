@@ -42,6 +42,10 @@ final class AdminShippingController extends Controller
             throw ValidationException::withMessages(['isEnabled' => 'Configure MELHOR_ENVIO_TOKEN no ambiente antes de ativar o frete.']);
         }
 
+        if ((bool) $data['isEnabled'] && preg_replace('/\D+/', '', (string) ($data['originZip'] ?? '')) === '') {
+            throw ValidationException::withMessages(['originZip' => 'Informe o CEP de origem antes de ativar o frete.']);
+        }
+
         DB::table('shipping_settings')->updateOrInsert(
             ['id' => 1],
             [

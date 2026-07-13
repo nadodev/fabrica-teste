@@ -27,6 +27,9 @@ Automatizado local com SQLite e HTTP simulado; validacao real de producao depend
 - SHIP-04: CEP com menos ou mais de 8 digitos; servidor recusa; obtido conforme esperado; OK.
 - SHIP-05: telefone fora de 10/11 digitos ou UF fora de 2 letras; checkout recusa; obtido conforme esperado; OK.
 - SHIP-05A: ativar o Melhor Envio sem `MELHOR_ENVIO_TOKEN`; painel recusa e orienta configurar o servidor; obtido conforme esperado; OK.
+- SHIP-05B: ativar sem CEP de origem; painel aponta especificamente o campo ausente; obtido conforme esperado; OK.
+- SHIP-05C: token e CEP ausentes durante cotacao; adaptador retorna mensagens distintas e acionaveis; obtido conforme esperado; OK.
+- SHIP-05D: executar `shipping:diagnose`; comando confirma os estados sem imprimir o token; obtido conforme esperado; OK.
 
 ## Casos de autorizacao
 

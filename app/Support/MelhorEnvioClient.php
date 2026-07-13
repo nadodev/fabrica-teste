@@ -24,8 +24,12 @@ final class MelhorEnvioClient
         $token = $this->token();
         $originZip = $this->onlyDigits((string) ($settings->origin_zip ?? ''));
 
-        if ($token === '' || $originZip === '') {
-            throw new RuntimeException('Configure MELHOR_ENVIO_TOKEN no servidor e informe o CEP de origem no painel de frete.');
+        if ($token === '') {
+            throw new RuntimeException('MELHOR_ENVIO_TOKEN nao foi carregado pela aplicacao. Configure a variavel no servidor e execute php artisan optimize:clear.');
+        }
+
+        if ($originZip === '') {
+            throw new RuntimeException('O CEP de origem nao esta salvo. Informe e salve o CEP no painel de frete.');
         }
 
         $endpoint = ((string) $settings->environment === 'production')

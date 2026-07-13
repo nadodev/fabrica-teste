@@ -20,6 +20,8 @@ Compra e impressao de etiquetas, renovacao OAuth automatica e persistencia de ba
 - CEP inexistente nao inventa endereco e indisponibilidade externa nao impede preenchimento manual.
 - Token de sandbox nao pode ser usado em producao e vice-versa.
 - A credencial e lida somente de `MELHOR_ENVIO_TOKEN`; requisicoes administrativas nao recebem nem persistem o token.
+- Linhas duplicadas no `.env` devem ser removidas: uma definicao vazia posterior pode sobrescrever o token valido.
+- `php artisan shipping:diagnose` informa token, ativacao, ambiente e CEP apenas como estado, sem exibir a credencial.
 - O frete nao pode ser ativado enquanto a variavel de ambiente estiver vazia.
 
 ## Fluxo principal
@@ -76,7 +78,7 @@ Consulte `docs/qa/2026-07-13-shipping-and-postal-address.md`.
 
 ## Como validar
 
-Definir `MELHOR_ENVIO_TOKEN` no `.env`, limpar o cache de configuracao, executar migrations, selecionar o ambiente correspondente no painel e calcular um frete com CEP valido.
+Definir uma unica vez `MELHOR_ENVIO_TOKEN` no `.env`, executar `php artisan optimize:clear`, selecionar o ambiente correspondente no painel e salvar o CEP de origem. Executar `php artisan shipping:diagnose` antes de calcular um frete com CEP valido.
 
 ## Riscos e limitacoes
 
