@@ -30,10 +30,12 @@ Automatizado local com SQLite e HTTP simulado; validacao real de producao depend
 - SHIP-05B: ativar sem CEP de origem; painel aponta especificamente o campo ausente; obtido conforme esperado; OK.
 - SHIP-05C: token e CEP ausentes durante cotacao; adaptador retorna mensagens distintas e acionaveis; obtido conforme esperado; OK.
 - SHIP-05D: executar `shipping:diagnose`; comando confirma os estados sem imprimir o token; obtido conforme esperado; OK.
+- SHIP-05E: executar `shipping:diagnose --verify` com resposta autenticada; comando confirma acesso no ambiente de produção sem imprimir token ou dados da conta; obtido conforme esperado; OK.
 
 ## Casos de autorizacao
 
 - SHIP-06: token invalido ou de outro ambiente; mensagem orienta gerar novo token; obtido conforme esperado; OK.
+- SHIP-06A: API retorna 401 no diagnóstico remoto; comando falha, informa autenticação recusada e não expõe a credencial; obtido conforme esperado; OK.
 
 ## Casos de falha
 
@@ -62,7 +64,7 @@ Nao aplicavel a consultas somente leitura.
 
 ## Evidencias
 
-Suite focada com 8 testes e 27 assercoes; suite completa com 71 testes e 435 assercoes; verificacoes estaticas e build aprovados.
+Suite focada com 13 testes e 43 assercoes; suite completa com 77 testes e 468 assercoes; PHPStan, Pint, ESLint, TypeScript, Prettier e build aprovados.
 
 ## Riscos conhecidos
 

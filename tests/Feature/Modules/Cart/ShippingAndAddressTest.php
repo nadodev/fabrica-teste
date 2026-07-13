@@ -58,7 +58,7 @@ it('returns an actionable message when Melhor Envio refuses the token', function
     ]);
 
     app(MelhorEnvioClient::class)->quote('01001000', shippingCartView());
-})->throws(RuntimeException::class, 'Gere um novo token');
+})->throws(RuntimeException::class, 'Integracoes > Permissoes de Acesso');
 
 it('looks up a postal address through the protected ViaCEP adapter', function () {
     Http::fake([
@@ -161,6 +161,40 @@ it('diagnoses Melhor Envio readiness without exposing the token', function () {
         ->expectsOutputToContain('CEP de origem: CONFIGURADO')
         ->doesntExpectOutputToContain('secret-environment-token')
         ->assertSuccessful();
+});
+
+it('verifies Melhor Envio credentials against the selected environment', function () {
+    config()->set('services.melhor_envio.token', 'secret-environment-token');
+    DB::table('shipping_settings')->where('id', 1)->update([
+        'is_enabled' => true,
+        'environment' => 'production',
+        'origin_zip' => '89600000',
+    ]);
+    Http::fake([
+        'https://melhorenvio.com.br/api/v2/me' => Http::response(['id' => 'user-id']),
+    ]);
+
+    $this->artisan('shipping:diagnose --verify')
+        ->expectsOutputToContain('Autenticacao remota do Melhor Envio: APROVADA')
+        ->doesntExpectOutputToContain('secret-environment-token')
+        ->assertSuccessful();
+});
+
+it('reports when Melhor Envio rejects the configured credential', function () {
+    config()->set('services.melhor_envio.token', 'rejected-environment-token');
+    DB::table('shipping_settings')->where('id', 1)->update([
+        'is_enabled' => true,
+        'environment' => 'production',
+        'origin_zip' => '89600000',
+    ]);
+    Http::fake([
+        'https://melhorenvio.com.br/api/v2/me' => Http::response(['message' => 'Unauthenticated.'], 401),
+    ]);
+
+    $this->artisan('shipping:diagnose --verify')
+        ->expectsOutputToContain('Autenticacao remota do Melhor Envio: RECUSADA')
+        ->doesntExpectOutputToContain('rejected-environment-token')
+        ->assertFailed();
 });
 
 it('saves shipping settings without accepting a database token', function () {

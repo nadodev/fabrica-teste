@@ -6,6 +6,7 @@ use App\Modules\Payment\Application\Command\ProcessAsaasWebhooks;
 use App\Modules\Payment\Application\Command\ProcessPaymentOutbox;
 use App\Modules\Payment\Application\Command\ReconcileAsaasPayments;
 use App\Modules\Payment\Application\Command\RecoverStuckPayment;
+use App\Support\MelhorEnvioClient;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -16,7 +17,7 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
-Artisan::command('shipping:diagnose', function (): int {
+Artisan::command('shipping:diagnose {--verify}', function (MelhorEnvioClient $client): int {
     $tokenConfigured = trim((string) config('services.melhor_envio.token')) !== '';
     $settings = DB::table('shipping_settings')->where('id', 1)->first();
     $enabled = (bool) ($settings->is_enabled ?? false);
@@ -34,6 +35,18 @@ Artisan::command('shipping:diagnose', function (): int {
         $this->error('A integracao de frete ainda nao esta pronta. Corrija os itens marcados como AUSENTE ou NAO.');
 
         return Command::FAILURE;
+    }
+
+    if ((bool) $this->option('verify')) {
+        try {
+            $client->verifyCredentials();
+            $this->info('Autenticacao remota do Melhor Envio: APROVADA');
+        } catch (RuntimeException $exception) {
+            $this->error('Autenticacao remota do Melhor Envio: RECUSADA');
+            $this->error($exception->getMessage());
+
+            return Command::FAILURE;
+        }
     }
 
     $this->info('Configuracao local do Melhor Envio pronta para cotacao.');

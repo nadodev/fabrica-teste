@@ -12,6 +12,36 @@ use RuntimeException;
 
 final class MelhorEnvioClient
 {
+    public function verifyCredentials(): void
+    {
+        $settings = DB::table('shipping_settings')->where('id', 1)->first();
+        $token = $this->token();
+
+        if ($token === '') {
+            throw new RuntimeException('MELHOR_ENVIO_TOKEN nao foi carregado pela aplicacao.');
+        }
+
+        $environment = (string) ($settings->environment ?? 'sandbox');
+        $baseUrl = $environment === 'production'
+            ? 'https://melhorenvio.com.br'
+            : 'https://sandbox.melhorenvio.com.br';
+
+        $response = Http::withToken($token)
+            ->acceptJson()
+            ->withHeaders(['User-Agent' => $this->userAgent()])
+            ->timeout(20)
+            ->get($baseUrl.'/api/v2/me');
+
+        if ($response->failed()) {
+            Log::warning('Melhor Envio credential verification failed', [
+                'status' => $response->status(),
+                'environment' => $environment,
+            ]);
+
+            throw new RuntimeException($this->errorMessage($response->json(), $response->status()));
+        }
+    }
+
     /** @return list<array<string, int|string>> */
     public function quote(string $destinationZip, CartView $cart): array
     {
@@ -142,7 +172,7 @@ final class MelhorEnvioClient
     private function errorMessage(mixed $body, int $status): string
     {
         if ($status === 401 || $status === 403) {
-            return 'Melhor Envio recusou o token. Gere um novo token no ambiente selecionado, configure MELHOR_ENVIO_TOKEN no servidor e limpe o cache da aplicacao.';
+            return 'Melhor Envio recusou o token. Gere a credencial em Integracoes > Permissoes de Acesso, use Selecionar todos, substitua a unica linha MELHOR_ENVIO_TOKEN e execute php artisan optimize:clear.';
         }
 
         $message = data_get($body, 'message') ?? data_get($body, 'error') ?? data_get($body, 'errors.0');
