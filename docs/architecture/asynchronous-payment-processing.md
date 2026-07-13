@@ -18,7 +18,9 @@ Gateways podem atrasar, falhar ou responder de forma ambigua. Manter locks duran
 - Recusa libera reserva, pagamento e pedido juntos.
 - Uma aprovacao cuja reserva nao pode ser confirmada e estornada de forma idempotente antes do cancelamento local.
 - Chaves estaveis permitem retry sem nova cobranca.
+- Antes da conversao do carrinho, `EnsurePaymentGatewayReady` usa a porta `PaymentGatewayReadiness` para rejeitar configuracao local desabilitada ou invalida sem criar pedido parcial.
+- Uma falha apos o commit permanece `pending` com `failure_code`; a interface diferencia falha retryable de processamento ativo e o outbox pode tentar novamente.
 
 ## Adaptabilidade
 
-O Asaas implementara `PaymentGateway` sem alterar os casos de uso. Webhook e reconciliacao chamarao as mesmas transicoes, adicionando verificacao de autenticidade e deduplicacao.
+Asaas e gateway falso implementam `PaymentGateway` e sua verificacao de prontidao sem expor configuracao a Presentation. Webhook e reconciliacao chamam as mesmas transicoes, com autenticidade e deduplicacao.

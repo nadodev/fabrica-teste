@@ -10,6 +10,7 @@ use App\Modules\Cart\Application\Query\ShowCart;
 use App\Modules\Ordering\Application\Command\CheckoutCart;
 use App\Modules\Ordering\Application\DTO\CheckoutData;
 use App\Modules\Ordering\Presentation\Http\Request\CheckoutRequest;
+use App\Modules\Payment\Application\Command\EnsurePaymentGatewayReady;
 use App\Modules\Payment\Application\Command\ProcessPayment;
 use App\Modules\Payment\Application\DTO\CreditCardData;
 use App\Modules\Payment\Application\Exception\PaymentCardDeclined;
@@ -54,8 +55,12 @@ final class CheckoutController extends Controller
         ]);
     }
 
-    public function store(CheckoutRequest $request, CheckoutCart $checkout, ProcessPayment $payments): RedirectResponse
-    {
+    public function store(
+        CheckoutRequest $request,
+        CheckoutCart $checkout,
+        ProcessPayment $payments,
+        EnsurePaymentGatewayReady $paymentGateway,
+    ): RedirectResponse {
         $settings = app(StoreSettings::class);
         $customers = $settings->customers();
         if ($request->user() === null && ((bool) ($customers['registrationRequired'] ?? false) || ! (bool) ($customers['guestCheckout'] ?? true))) {
@@ -69,6 +74,9 @@ final class CheckoutController extends Controller
 
         try {
             $data = $request->validated();
+            if ($data['checkoutType'] === 'payment') {
+                $paymentGateway->handle();
+            }
             $user = Auth::user();
             $customerName = $user instanceof User ? $user->name : (string) $data['customerName'];
             $customerEmail = $user instanceof User ? $user->email : (string) $data['customerEmail'];
@@ -122,9 +130,11 @@ final class CheckoutController extends Controller
                 if (! $exception instanceof PaymentCardDeclined) {
                     report($exception);
                 }
-                $paymentError = $order->details()->paymentMethod === 'credit_card'
+                $paymentError = $exception instanceof PaymentCardDeclined
                     ? 'O pedido foi criado, mas o cartao nao foi autorizado. Confira os dados ou fale com a loja.'
-                    : 'O pedido foi criado, mas o pagamento ainda nao foi processado.';
+                    : ($order->details()->paymentMethod === 'credit_card'
+                        ? 'O pedido foi criado, mas o cartao nao pode ser processado agora. Fale com a loja antes de tentar novamente.'
+                        : 'O pedido foi criado, mas o pagamento nao pode ser processado agora. Tentaremos novamente automaticamente.');
             }
         }
 
@@ -149,6 +159,7 @@ final class CheckoutController extends Controller
             'checkoutType' => $view->checkoutType,
             'paymentMethod' => $view->paymentMethod,
             'paymentStatus' => $view->paymentStatus,
+            'paymentFailureCode' => $view->paymentFailureCode,
             'instructions' => $view->instructions,
         ]);
     }

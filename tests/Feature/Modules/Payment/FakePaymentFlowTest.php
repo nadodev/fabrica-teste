@@ -16,6 +16,7 @@ use App\Modules\Payment\Application\DTO\CreditCardData;
 use App\Modules\Payment\Application\Exception\PaymentCardDeclined;
 use App\Modules\Payment\Application\Exception\PaymentGatewayTimeout;
 use App\Modules\Payment\Application\Port\PaymentGateway;
+use App\Modules\Payment\Application\Query\ShowCheckoutSuccess;
 use App\Modules\Shared\Domain\ValueObject\Money;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -128,6 +129,8 @@ it('returns a failed Asaas attempt to pending instead of leaving it stuck proces
         'status' => 'failed',
         'response_code' => 'gateway_error',
     ]);
+    expect(app(ShowCheckoutSuccess::class)->handle($order->number, $order->id, null)?->paymentFailureCode)
+        ->toBe('gateway_error');
 });
 
 it('manually recovers only a payment stuck before receiving a provider ID', function () {

@@ -229,6 +229,49 @@ it('maps the public checkout request to the transactional use case', function ()
     ]);
 });
 
+it('keeps the cart active and does not create an order when Asaas is not ready', function () {
+    config()->set('payment.gateway', 'asaas');
+    config()->set('payment.asaas.live_enabled', false);
+    $productId = (string) Str::uuid();
+    ProductRecord::query()->create([
+        'id' => $productId,
+        'sku' => 'ASAAS-NOT-READY',
+        'name' => 'Produto sem gateway',
+        'description' => '',
+        'price_amount' => 5000,
+        'price_currency' => 'BRL',
+        'status' => 'active',
+    ]);
+    app(DatabaseStockGateway::class)->receive('asaas-not-ready-stock', $productId, 1);
+    $token = 'asaas-not-ready-cart';
+    $cart = new Cart((string) Str::uuid(), hash('sha256', $token));
+    $cart->add($productId, 'Produto sem gateway', new Money(5000), 1, 'ASAAS-NOT-READY');
+    app(CartRepository::class)->save($cart);
+
+    $response = $this->from(route('checkout'))->withSession(['cart_token' => $token])->post(route('checkout.store'), [
+        'customerName' => 'Cliente Gateway',
+        'customerEmail' => 'gateway@example.com',
+        'customerPhone' => '11999999999',
+        'customerDocument' => '12345678909',
+        'shippingZip' => '01001000',
+        'shippingAddress' => 'Rua Gateway',
+        'shippingNumber' => '10',
+        'shippingCity' => 'Sao Paulo',
+        'shippingState' => 'SP',
+        'checkoutType' => 'payment',
+        'deliveryMethod' => 'pickup',
+        'paymentMethod' => 'pix',
+        'privacyAccepted' => true,
+    ], ['Idempotency-Key' => (string) Str::uuid()]);
+
+    $response->assertRedirect(route('checkout'))
+        ->assertSessionHasErrors('checkout')
+        ->assertSessionHas('cart_token', $token);
+    $this->assertDatabaseHas('cart_carts', ['id' => $cart->id, 'status' => 'active']);
+    $this->assertDatabaseCount('ordering_orders', 0);
+    $this->assertDatabaseCount('payment_payments', 0);
+});
+
 it('creates and securely displays Pix instructions immediately after checkout', function () {
     config()->set('payment.gateway', 'asaas');
     config()->set('payment.asaas.live_enabled', true);

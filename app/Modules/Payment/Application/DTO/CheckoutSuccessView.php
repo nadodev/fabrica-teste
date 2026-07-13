@@ -11,6 +11,7 @@ final readonly class CheckoutSuccessView
         public string $checkoutType,
         public string $paymentMethod,
         public string $paymentStatus,
+        public ?string $paymentFailureCode,
         public ?PaymentInstructions $instructions,
     ) {}
 }

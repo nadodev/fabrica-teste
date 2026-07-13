@@ -31,6 +31,7 @@ final readonly class ShowCheckoutSuccess
             $order->details()->checkoutType,
             $order->details()->paymentMethod,
             $payment?->status()->value ?? $order->details()->paymentStatus,
+            $payment?->failureCode(),
             $payment === null ? null : $this->instructions->find($payment->id),
         );
     }

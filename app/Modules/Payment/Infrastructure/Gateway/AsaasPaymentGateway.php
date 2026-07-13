@@ -24,7 +24,7 @@ final readonly class AsaasPaymentGateway implements PaymentGateway, PaymentRecon
 
     public function charge(#[\SensitiveParameter] PaymentRequest $request): PaymentResult
     {
-        $this->ensureLiveEnabled();
+        $this->assertReady();
 
         try {
             $existing = $this->client()->get('/payments', ['externalReference' => $request->orderId])->throw()->json('data.0');
@@ -91,7 +91,7 @@ final readonly class AsaasPaymentGateway implements PaymentGateway, PaymentRecon
 
     public function refund(string $transactionId, string $idempotencyKey, ?int $amount = null): PaymentResult
     {
-        $this->ensureLiveEnabled();
+        $this->assertReady();
 
         try {
             $body = $amount === null ? [] : ['value' => $amount / 100, 'description' => 'Estorno da loja '.$idempotencyKey];
@@ -109,7 +109,7 @@ final readonly class AsaasPaymentGateway implements PaymentGateway, PaymentRecon
 
     public function fetch(string $providerPaymentId): ProviderPaymentSnapshot
     {
-        $this->ensureLiveEnabled();
+        $this->assertReady();
 
         try {
             $response = $this->client()->get('/payments/'.$providerPaymentId)->throw()->json();
@@ -176,10 +176,7 @@ final readonly class AsaasPaymentGateway implements PaymentGateway, PaymentRecon
 
     private function client(): PendingRequest
     {
-        $key = trim((string) config('payment.asaas.api_key'));
-        if (! str_starts_with($key, '$aact_prod_')) {
-            throw new RuntimeException('A valid Asaas production API key is required.');
-        }
+        $key = $this->productionKey();
 
         return Http::baseUrl(rtrim((string) config('payment.asaas.base_url'), '/'))
             ->acceptJson()
@@ -188,11 +185,26 @@ final readonly class AsaasPaymentGateway implements PaymentGateway, PaymentRecon
             ->timeout(65);
     }
 
-    private function ensureLiveEnabled(): void
+    public function assertReady(): void
     {
         if (! (bool) config('payment.asaas.live_enabled')) {
-            throw new RuntimeException('Asaas live charges are disabled.');
+            throw new RuntimeException('O pagamento esta temporariamente indisponivel. A integracao Asaas de producao nao esta habilitada.');
         }
+
+        $this->productionKey();
+    }
+
+    private function productionKey(): string
+    {
+        $key = trim((string) config('payment.asaas.api_key'));
+        if (str_starts_with($key, 'aact_prod_')) {
+            $key = '$'.$key;
+        }
+        if (! str_starts_with($key, '$aact_prod_')) {
+            throw new RuntimeException('O pagamento esta temporariamente indisponivel. A chave de producao do Asaas e invalida.');
+        }
+
+        return $key;
     }
 
     private function billingType(string $method): string

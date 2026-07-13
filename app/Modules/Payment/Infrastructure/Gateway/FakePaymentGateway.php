@@ -15,6 +15,8 @@ final readonly class FakePaymentGateway implements PaymentGateway
 {
     public function __construct(private ConnectionInterface $database) {}
 
+    public function assertReady(): void {}
+
     public function charge(PaymentRequest $request): PaymentResult
     {
         $outcome = (string) config('payment.fake_outcome', 'approved');

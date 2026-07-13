@@ -7,7 +7,7 @@ namespace App\Modules\Payment\Application\Port;
 use App\Modules\Payment\Application\DTO\PaymentRequest;
 use App\Modules\Payment\Application\DTO\PaymentResult;
 
-interface PaymentGateway
+interface PaymentGateway extends PaymentGatewayReadiness
 {
     public function charge(PaymentRequest $request): PaymentResult;
 

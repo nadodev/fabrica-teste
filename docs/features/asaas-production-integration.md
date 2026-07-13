@@ -10,7 +10,7 @@ Clientes, PIX com QR Code e copia e cola, boleto, cartao, estorno total e parcia
 
 ## Fora do escopo
 
-Primeira cobranca real, ainda bloqueada por `ASAAS_LIVE_ENABLED=false`.
+Execucao automatica de uma cobranca real durante testes locais. A primeira validacao financeira deve ser iniciada conscientemente no site publicado.
 
 ## Regras de negocio
 
@@ -28,10 +28,13 @@ Primeira cobranca real, ainda bloqueada por `ASAAS_LIVE_ENABLED=false`.
 - Cartao exige nome impresso, numero, validade e codigo de seguranca validos, alem dos dados do titular e IP real do comprador.
 - Numero completo e codigo de seguranca existem apenas durante a requisicao: nao entram no pedido, sessao, banco, outbox ou logs.
 - Recusa HTTP 400 do cartao encerra o pagamento como recusado, cancela o pedido e libera a reserva sem inventar um ID de cobranca Asaas.
+- O checkout valida a prontidao local do gateway antes de converter o carrinho. Integracao desabilitada ou chave invalida nao cria pedido, nao reserva estoque e preserva o carrinho.
+- Chaves de producao salvas como `aact_prod_...` por perda do caractere especial sao normalizadas para `$aact_prod_...` apenas no servidor antes do envio.
+- Falha transitoria persistida e exibida como indisponibilidade, sem manter a interface indefinidamente no estado "Gerando pagamento".
 
 ## Fluxo principal
 
-No checkout pago, a cobranca e criada imediatamente. PIX retorna QR Code e copia e cola. Cartao abre os campos somente quando selecionado e envia os dados transitorios diretamente ao Asaas junto com titular e IP. O outbox permanece como fallback, consulta por `externalReference` antes de criar e nao duplica uma cobranca ja vinculada. O endpoint `/webhooks/asaas` autentica, reduz e grava o evento; o scheduler aplica a transicao. A cada 15 minutos, pagamentos abertos sao consultados no Asaas e transformados nos mesmos eventos internos para recuperar webhooks perdidos.
+No checkout pago, `EnsurePaymentGatewayReady` valida a configuracao e, somente depois, o pedido e criado. A cobranca e criada imediatamente. PIX retorna QR Code e copia e cola. Cartao abre os campos somente quando selecionado e envia os dados transitorios diretamente ao Asaas junto com titular e IP. O outbox permanece como fallback, consulta por `externalReference` antes de criar e nao duplica uma cobranca ja vinculada. O endpoint `/webhooks/asaas` autentica, reduz e grava o evento; o scheduler aplica a transicao. A cada 15 minutos, pagamentos abertos sao consultados no Asaas e transformados nos mesmos eventos internos para recuperar webhooks perdidos.
 
 ## Fluxos alternativos
 
@@ -39,7 +42,7 @@ Timeout permanece retryable. Eventos informativos sao auditados sem alterar pedi
 
 ## Casos de uso
 
-`ProcessPayment`, `ReceiveAsaasWebhook`, `ProcessAsaasWebhooks` e `ReconcileAsaasPayments`. `ProcessPayment` recebe `CreditCardData` somente na chamada sincrona do checkout.
+`EnsurePaymentGatewayReady`, `ProcessPayment`, `ReceiveAsaasWebhook`, `ProcessAsaasWebhooks` e `ReconcileAsaasPayments`. `ProcessPayment` recebe `CreditCardData` somente na chamada sincrona do checkout.
 
 ## Arquitetura
 
@@ -47,7 +50,7 @@ Timeout permanece retryable. Eventos informativos sao auditados sem alterar pedi
 
 ## Portas e adaptadores
 
-HTTP do Laravel para Asaas; persistencia SQL para clientes e inbox; portas de Ordering e Inventory para efeitos locais.
+`PaymentGatewayReadiness` isola a validacao de configuracao. HTTP do Laravel para Asaas; persistencia SQL para clientes e inbox; portas de Ordering e Inventory para efeitos locais.
 
 ## Persistencia
 
@@ -71,7 +74,7 @@ Somente eventos de cobrancas selecionados no Asaas sao aceitos e novos campos de
 
 ## Interface
 
-A URL publica configurada e `https://fabricafardamento.gejalabs.com.br/webhooks/asaas`. A pagina de confirmacao exibe QR Code, copia e cola, vencimento e atualiza o estado automaticamente. Ao escolher cartao, o checkout mostra nome impresso, numero, mes, ano e codigo de seguranca com feedback de validacao e processamento.
+A URL publica configurada e `https://fabricafardamento.gejalabs.com.br/webhooks/asaas`. A pagina de confirmacao exibe QR Code, copia e cola, vencimento e atualiza o estado automaticamente. Quando existe falha persistida, mostra a indisponibilidade ou recusa e oculta o bloco enganoso de geracao. Ao escolher cartao, o checkout mostra nome impresso, numero, mes, ano e codigo de seguranca com feedback de validacao e processamento.
 
 ## Testes automatizados
 
@@ -83,8 +86,8 @@ Consulte `docs/qa/2026-07-13-asaas-production-integration.md`.
 
 ## Como validar
 
-Publicar, executar migrations e scheduler, validar HTTPS e somente entao habilitar a primeira cobranca controlada.
+Publicar, configurar `PAYMENT_GATEWAY=asaas`, `ASAAS_BASE_URL=https://api.asaas.com/v3`, `ASAAS_LIVE_ENABLED=true` e a chave integral de producao entre aspas simples, limpar/recriar o cache de configuracao, manter o scheduler ativo e validar uma primeira cobranca controlada em HTTPS.
 
 ## Riscos e limitacoes
 
-Sem sandbox, a validacao final movimentara dinheiro real. A reconciliacao depende do scheduler ativo e a validacao de concorrencia ainda precisa ocorrer em MySQL/InnoDB no ambiente publicado.
+Sem sandbox, a validacao final movimentara dinheiro real. Pedidos antigos com falha antes do ID Asaas precisam de `payments:process` depois da correcao da configuracao. A reconciliacao e as novas tentativas dependem do scheduler ativo, e a validacao de concorrencia ainda precisa ocorrer em MySQL/InnoDB no ambiente publicado.

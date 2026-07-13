@@ -14,12 +14,14 @@ export default function PedidoConfirmado({
     checkoutType,
     paymentMethod,
     paymentStatus,
+    paymentFailureCode,
     instructions,
 }: {
     orderNumber: string;
     checkoutType: string;
     paymentMethod: string;
     paymentStatus: string;
+    paymentFailureCode: string | null;
     instructions: Instructions;
 }) {
     const [copied, setCopied] = useState(false);
@@ -28,7 +30,15 @@ export default function PedidoConfirmado({
         errors?: Record<string, string>;
     }>();
     const whatsapp = page.props.siteSettings?.whatsapp?.replace(/\D/g, '');
-    const paymentError = page.props.errors?.payment;
+    const paymentError =
+        page.props.errors?.payment ??
+        (paymentFailureCode === 'declined'
+            ? 'O cartao nao foi autorizado. Confira os dados ou fale com a loja.'
+            : paymentFailureCode
+              ? paymentMethod === 'credit_card'
+                  ? 'O cartao nao pode ser processado por uma indisponibilidade temporaria. Fale com a loja antes de tentar novamente.'
+                  : 'O pagamento ainda nao foi gerado por uma indisponibilidade temporaria. Uma nova tentativa sera feita automaticamente.'
+              : null);
     const pixReady =
         paymentMethod === 'pix' && Boolean(instructions?.pixPayload);
     const qrImage = instructions?.pixEncodedImage
@@ -46,7 +56,9 @@ export default function PedidoConfirmado({
         }
 
         const timer = window.setInterval(() => {
-            router.reload({ only: ['paymentStatus', 'instructions'] });
+            router.reload({
+                only: ['paymentStatus', 'paymentFailureCode', 'instructions'],
+            });
         }, 5000);
 
         return () => window.clearInterval(timer);
@@ -138,7 +150,9 @@ export default function PedidoConfirmado({
 
                 {!pixReady &&
                     checkoutType === 'payment' &&
-                    !instructions?.paymentUrl && (
+                    !instructions?.paymentUrl &&
+                    !paymentFailureCode &&
+                    ['pending', 'processing'].includes(paymentStatus) && (
                         <div className="mt-6 rounded-xl bg-bg-soft p-4 text-left">
                             <div className="flex gap-3">
                                 <PackageCheck className="mt-0.5 h-5 w-5 text-navy" />

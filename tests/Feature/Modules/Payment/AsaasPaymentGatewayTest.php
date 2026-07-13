@@ -53,7 +53,28 @@ it('does not call Asaas while the production safety switch is disabled', functio
         'order-asaas-2', 1000, 'BRL', 'pix', 'idem-2',
         ['name' => 'Cliente', 'email' => 'cliente@example.com', 'document' => '12345678909'],
     ));
-})->throws(RuntimeException::class, 'Asaas live charges are disabled');
+})->throws(RuntimeException::class, 'A integracao Asaas de producao nao esta habilitada');
+
+it('restores the dollar prefix when the production key was saved without it', function () {
+    config()->set('payment.asaas.api_key', 'aact_prod_test_only');
+    Http::fake([
+        'https://api.asaas.com/v3/payments?*' => Http::response(['data' => [[
+            'id' => 'pay_existing',
+            'status' => 'PENDING',
+        ]]]),
+        'https://api.asaas.com/v3/payments/pay_existing/pixQrCode' => Http::response([
+            'encodedImage' => 'aW1hZ2Vt',
+            'payload' => '000201PIX',
+        ]),
+    ]);
+
+    app(AsaasPaymentGateway::class)->charge(new PaymentRequest(
+        'order-prefix', 1000, 'BRL', 'pix', 'idem-prefix',
+        ['name' => 'Cliente', 'email' => 'cliente@example.com', 'document' => '12345678909'],
+    ));
+
+    Http::assertSent(fn ($request): bool => $request->hasHeader('access_token', '$aact_prod_test_only'));
+});
 
 it('sends transient credit card data and the customer IP to Asaas', function () {
     Http::fake([
