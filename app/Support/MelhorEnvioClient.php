@@ -12,8 +12,6 @@ use RuntimeException;
 
 final class MelhorEnvioClient
 {
-    public function __construct(private readonly ShippingToken $tokens) {}
-
     /** @return list<array<string, int|string>> */
     public function quote(string $destinationZip, CartView $cart): array
     {
@@ -23,11 +21,11 @@ final class MelhorEnvioClient
             throw new RuntimeException('Configure e ative o Melhor Envio no painel administrativo.');
         }
 
-        $token = $this->tokens->decode($settings->token ?? null);
+        $token = $this->token();
         $originZip = $this->onlyDigits((string) ($settings->origin_zip ?? ''));
 
         if ($token === '' || $originZip === '') {
-            throw new RuntimeException('Informe o token e o CEP de origem do Melhor Envio.');
+            throw new RuntimeException('Configure MELHOR_ENVIO_TOKEN no servidor e informe o CEP de origem no painel de frete.');
         }
 
         $endpoint = ((string) $settings->environment === 'production')
@@ -132,10 +130,15 @@ final class MelhorEnvioClient
         return $email === '' ? $name : $name.' ('.$email.')';
     }
 
+    private function token(): string
+    {
+        return trim((string) preg_replace('/^Bearer\s+/i', '', trim((string) config('services.melhor_envio.token'))));
+    }
+
     private function errorMessage(mixed $body, int $status): string
     {
         if ($status === 401 || $status === 403) {
-            return 'Melhor Envio recusou o token. Gere um novo token no ambiente selecionado e salve novamente no painel de frete.';
+            return 'Melhor Envio recusou o token. Gere um novo token no ambiente selecionado, configure MELHOR_ENVIO_TOKEN no servidor e limpe o cache da aplicacao.';
         }
 
         $message = data_get($body, 'message') ?? data_get($body, 'error') ?? data_get($body, 'errors.0');

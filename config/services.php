@@ -35,4 +35,8 @@ return [
         ],
     ],
 
+    'melhor_envio' => [
+        'token' => env('MELHOR_ENVIO_TOKEN'),
+    ],
+
 ];

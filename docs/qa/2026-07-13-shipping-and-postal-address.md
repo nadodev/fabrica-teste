@@ -6,7 +6,7 @@ Validar cotacao de frete, seguranca do token, mascaras e preenchimento postal.
 
 ## Pre-condicoes
 
-Migrations aplicadas, Melhor Envio ativo e token correspondente ao ambiente.
+Migrations aplicadas, `MELHOR_ENVIO_TOKEN` configurado e ambiente correspondente selecionado.
 
 ## Dados de teste
 
@@ -20,12 +20,13 @@ Automatizado local com SQLite e HTTP simulado; validacao real de producao depend
 
 - SHIP-01: cotacao usa `https://melhorenvio.com.br`, Bearer e User-Agent; obtido conforme esperado; OK.
 - SHIP-02: CEP valido preenche logradouro, cidade e UF; obtido conforme esperado; OK.
-- SHIP-03: token fica criptografado e nao aparece no HTML/Inertia do admin; obtido conforme esperado; OK.
+- SHIP-03: token vem somente da configuracao, nao aparece no HTML/Inertia e nao existe coluna de token no banco; obtido conforme esperado; OK.
 
 ## Casos de validacao
 
 - SHIP-04: CEP com menos ou mais de 8 digitos; servidor recusa; obtido conforme esperado; OK.
 - SHIP-05: telefone fora de 10/11 digitos ou UF fora de 2 letras; checkout recusa; obtido conforme esperado; OK.
+- SHIP-05A: ativar o Melhor Envio sem `MELHOR_ENVIO_TOKEN`; painel recusa e orienta configurar o servidor; obtido conforme esperado; OK.
 
 ## Casos de autorizacao
 
@@ -58,7 +59,7 @@ Nao aplicavel a consultas somente leitura.
 
 ## Evidencias
 
-Testes de feature, verificacoes estaticas e build registrados na entrega.
+Suite focada com 8 testes e 27 assercoes; suite completa com 71 testes e 435 assercoes; verificacoes estaticas e build aprovados.
 
 ## Riscos conhecidos
 

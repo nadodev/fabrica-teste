@@ -3,9 +3,9 @@
 use App\Models\User;
 use App\Modules\Cart\Application\DTO\CartView;
 use App\Support\MelhorEnvioClient;
-use App\Support\ShippingToken;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Schema;
 use Inertia\Testing\AssertableInertia as Assert;
 
 function shippingCartView(): CartView
@@ -20,11 +20,11 @@ function shippingCartView(): CartView
 }
 
 it('uses the official production endpoint and authenticated Melhor Envio headers', function () {
+    config()->set('services.melhor_envio.token', 'production-token');
     DB::table('shipping_settings')->where('id', 1)->update([
         'is_enabled' => true,
         'environment' => 'production',
         'origin_zip' => '89600000',
-        'token' => app(ShippingToken::class)->encode('production-token'),
     ]);
     Http::fake([
         'https://melhorenvio.com.br/api/v2/me/shipment/calculate' => Http::response([[
@@ -47,11 +47,11 @@ it('uses the official production endpoint and authenticated Melhor Envio headers
 });
 
 it('returns an actionable message when Melhor Envio refuses the token', function () {
+    config()->set('services.melhor_envio.token', 'expired-token');
     DB::table('shipping_settings')->where('id', 1)->update([
         'is_enabled' => true,
         'environment' => 'production',
         'origin_zip' => '89600000',
-        'token' => app(ShippingToken::class)->encode('expired-token'),
     ]);
     Http::fake([
         'https://melhorenvio.com.br/api/v2/me/shipment/calculate' => Http::response(['message' => 'Unauthenticated.'], 401),
@@ -92,33 +92,54 @@ it('handles an unknown postal code without inventing an address', function () {
         ->assertJson(['message' => 'CEP nao encontrado.']);
 });
 
-it('keeps the encrypted shipping token out of the admin response', function () {
+it('reports only whether the environment token is configured to the admin', function () {
     $admin = User::factory()->create(['is_admin' => true]);
-    $encrypted = app(ShippingToken::class)->encode('secret-production-token');
-    DB::table('shipping_settings')->where('id', 1)->update(['token' => $encrypted]);
+    config()->set('services.melhor_envio.token', 'secret-production-token');
 
     $this->actingAs($admin)->get(route('admin.shipping.edit'))
         ->assertOk()
         ->assertInertia(fn (Assert $page): Assert => $page
             ->component('admin/shipping')
-            ->where('shipping.hasToken', true)
-            ->where('shipping.token', '')
-            ->where('shipping.tokenPreview', 'salvo, termina em -token'));
+            ->where('shipping.hasConfiguredToken', true)
+            ->missing('shipping.token')
+            ->missing('shipping.tokenPreview'));
 });
 
-it('requires a token from the newly selected Melhor Envio environment', function () {
+it('requires an environment token before enabling Melhor Envio', function () {
     $admin = User::factory()->create(['is_admin' => true]);
-    DB::table('shipping_settings')->where('id', 1)->update([
-        'environment' => 'sandbox',
-        'token' => app(ShippingToken::class)->encode('sandbox-token'),
-    ]);
+    config()->set('services.melhor_envio.token', null);
 
     $this->actingAs($admin)->post(route('admin.shipping.update'), [
         'isEnabled' => true,
         'environment' => 'production',
         'originZip' => '89600-000',
-        'token' => '',
         'options' => [],
     ], ['Idempotency-Key' => 'shipping-environment-change'])
-        ->assertSessionHasErrors('token');
+        ->assertSessionHasErrors('isEnabled');
+});
+
+it('saves shipping settings without accepting a database token', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+    config()->set('services.melhor_envio.token', 'environment-token');
+
+    $this->actingAs($admin)->post(route('admin.shipping.update'), [
+        'isEnabled' => true,
+        'environment' => 'production',
+        'originZip' => '89600-000',
+        'token' => 'must-not-be-persisted',
+        'options' => ['pickupEnabled' => true],
+    ], ['Idempotency-Key' => 'shipping-environment-token'])
+        ->assertSessionHasNoErrors();
+
+    $this->assertDatabaseHas('shipping_settings', [
+        'id' => 1,
+        'is_enabled' => true,
+        'environment' => 'production',
+        'origin_zip' => '89600000',
+    ]);
+    expect(Schema::hasColumn('shipping_settings', 'token'))->toBeFalse();
+});
+
+it('does not keep a Melhor Envio token column in the database', function () {
+    expect(Schema::hasColumn('shipping_settings', 'token'))->toBeFalse();
 });

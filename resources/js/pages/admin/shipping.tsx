@@ -9,8 +9,7 @@ type ShippingSettings = {
     isEnabled: boolean;
     environment: 'sandbox' | 'production';
     originZip: string;
-    hasToken: boolean;
-    tokenPreview: string | null;
+    hasConfiguredToken: boolean;
     options?: Record<string, string | boolean | number | null>;
 };
 
@@ -23,7 +22,6 @@ export default function AdminShipping({
         isEnabled: shipping.isEnabled,
         environment: shipping.environment,
         originZip: formatPostalCode(shipping.originZip ?? ''),
-        token: '',
         options: {
             postingAddress: String(shipping.options?.postingAddress ?? ''),
             productionExtraDays: String(
@@ -131,34 +129,18 @@ export default function AdminShipping({
                         </Field>
                     </div>
 
-                    <Field
-                        label={
-                            shipping.hasToken
-                                ? 'Novo token (opcional)'
-                                : 'Token Melhor Envio'
-                        }
-                        error={form.errors.token}
+                    <div
+                        className={`mt-5 rounded-lg px-3 py-3 text-sm font-semibold ${
+                            shipping.hasConfiguredToken
+                                ? 'bg-green-50 text-green-800'
+                                : 'bg-red-50 text-red-800'
+                        }`}
                     >
-                        <textarea
-                            rows={5}
-                            className="input"
-                            value={form.data.token}
-                            onChange={(event) =>
-                                form.setData('token', event.target.value)
-                            }
-                            placeholder={
-                                shipping.hasToken
-                                    ? 'Deixe em branco para manter o token atual'
-                                    : 'Cole aqui o token de acesso'
-                            }
-                        />
-                    </Field>
-                    {shipping.tokenPreview && (
-                        <div className="mt-2 rounded-lg bg-green-50 px-3 py-2 text-sm font-semibold text-green-800">
-                            Token {shipping.tokenPreview}. Deixe o campo em
-                            branco para manter o atual.
-                        </div>
-                    )}
+                        {form.errors.isEnabled ??
+                            (shipping.hasConfiguredToken
+                                ? 'Token configurado com seguranca no ambiente do servidor.'
+                                : 'Configure MELHOR_ENVIO_TOKEN no ambiente do servidor.')}
+                    </div>
 
                     <section className="mt-6 rounded-xl border border-border bg-bg-soft p-4">
                         <h3 className="font-display text-lg font-black text-navy">
@@ -379,15 +361,15 @@ export default function AdminShipping({
                     <div className="mt-4 space-y-3 text-sm text-text-muted">
                         <p>
                             <strong className="text-navy">1.</strong> Gere o
-                            token no Melhor Envio.
+                            token de acesso no Melhor Envio.
                         </p>
                         <p>
                             <strong className="text-navy">2.</strong> Cole o
-                            token aqui e informe o CEP da loja.
+                            token em MELHOR_ENVIO_TOKEN no servidor.
                         </p>
                         <p>
                             <strong className="text-navy">3.</strong> Ative em
-                            sandbox para testar e depois mude para producao.
+                            exatamente o ambiente em que o token foi gerado.
                         </p>
                     </div>
                     <div className="mt-5 rounded-lg bg-bg-soft p-3 text-xs text-text-muted">
