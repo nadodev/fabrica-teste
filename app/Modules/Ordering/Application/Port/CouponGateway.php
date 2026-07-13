@@ -9,4 +9,6 @@ use App\Modules\Ordering\Application\ValueObject\CouponDiscount;
 interface CouponGateway
 {
     public function consume(string $code, int $subtotalAmount): CouponDiscount;
+
+    public function release(string $code): void;
 }

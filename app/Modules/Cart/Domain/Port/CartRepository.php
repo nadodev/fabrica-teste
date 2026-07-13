@@ -15,4 +15,6 @@ interface CartRepository
     public function save(Cart $cart): void;
 
     public function markConverted(Cart $cart): void;
+
+    public function restoreAfterFailedCheckout(string $cartId): void;
 }

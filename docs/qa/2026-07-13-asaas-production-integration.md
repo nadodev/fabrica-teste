@@ -29,14 +29,15 @@ Local, SQLite, API real nao chamada.
 - ASAAS-09A: integracao desativada ou falha antes do ID Asaas; pagamento retorna a `pending` em vez de ficar preso em `processing`; obtido conforme esperado; OK.
 - ASAAS-09B: Asaas devolve HTTP 400 para cartao; pagamento fica recusado, pedido cancelado e estoque liberado sem ID ficticio; obtido conforme esperado; OK.
 - ASAAS-09C: falha persistida antes do ID do provedor; pagina recebe `paymentFailureCode`, apresenta indisponibilidade e nao exibe "Gerando pagamento"; cobertura de servidor e estrutura frontend aprovadas; OK.
+- ASAAS-09D: cartao recusado; pedido fica cancelado para auditoria, estoque e cupom sao liberados, carrinho volta ativo e checkout mostra erro sem PAN/CVV; obtido conforme esperado; OK.
 ## Casos de concorrencia
 - ASAAS-10: webhook e reconciliacao simultaneos; inbox e locks evitam transicao duplicada; cobertura SQLite aprovada, MySQL/InnoDB pendente.
 ## Casos de idempotencia
 - ASAAS-11: mesmo ID de webhook duas vezes; uma linha e uma transicao; obtido conforme esperado; OK.
 - ASAAS-12: mesmo snapshot reconciliado novamente; fingerprint nao cria nova transicao; implementado; OK.
 ## Casos de regressao
-- ASAAS-13: testes focados de checkout e pagamentos; 26 testes e 159 assercoes aprovados.
-- ASAAS-14: suite completa; 69 testes e 433 assercoes aprovados.
+- ASAAS-13: testes focados de checkout e pagamentos; 27 testes e 176 assercoes aprovados.
+- ASAAS-14: suite completa; 72 testes e 452 assercoes aprovados.
 ## Casos responsivos
 - ASAAS-15: campos do cartao usam uma coluna no celular e duas em telas maiores; revisao estrutural concluida; validacao visual publicada pendente.
 ## Casos de acessibilidade

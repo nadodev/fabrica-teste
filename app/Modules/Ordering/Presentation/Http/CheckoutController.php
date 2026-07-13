@@ -104,14 +104,10 @@ final class CheckoutController extends Controller
                     $user instanceof User ? (int) $user->getAuthIdentifier() : null,
                 ),
             );
-            $request->session()->forget('cart_token');
-            $request->session()->forget('coupon_code');
-            $request->session()->forget(['shipping_quote', 'shipping_quotes', 'shipping_zip']);
         } catch (DomainException|RuntimeException $exception) {
             return back()->withErrors(['checkout' => $exception->getMessage()]);
         }
 
-        $request->session()->put('checkout_order_id', $order->id);
         $paymentError = null;
         if ($order->details()->checkoutType === 'payment') {
             try {
@@ -126,18 +122,22 @@ final class CheckoutController extends Controller
                     )
                     : null;
                 $payments->handle($order->id, $card);
+            } catch (PaymentCardDeclined) {
+                return to_route('checkout')->withErrors([
+                    'cardNumber' => 'O cartao nao foi autorizado. Confira os dados ou informe outro cartao.',
+                ]);
             } catch (Throwable $exception) {
-                if (! $exception instanceof PaymentCardDeclined) {
-                    report($exception);
-                }
-                $paymentError = $exception instanceof PaymentCardDeclined
-                    ? 'O pedido foi criado, mas o cartao nao foi autorizado. Confira os dados ou fale com a loja.'
-                    : ($order->details()->paymentMethod === 'credit_card'
-                        ? 'O pedido foi criado, mas o cartao nao pode ser processado agora. Fale com a loja antes de tentar novamente.'
-                        : 'O pedido foi criado, mas o pagamento nao pode ser processado agora. Tentaremos novamente automaticamente.');
+                report($exception);
+                $paymentError = $order->details()->paymentMethod === 'credit_card'
+                    ? 'O pedido foi criado, mas o cartao nao pode ser processado agora. Fale com a loja antes de tentar novamente.'
+                    : 'O pedido foi criado, mas o pagamento nao pode ser processado agora. Tentaremos novamente automaticamente.';
             }
         }
 
+        $request->session()->forget('cart_token');
+        $request->session()->forget('coupon_code');
+        $request->session()->forget(['shipping_quote', 'shipping_quotes', 'shipping_zip']);
+        $request->session()->put('checkout_order_id', $order->id);
         $redirect = to_route('checkout.success', ['order' => $order->number]);
 
         return $paymentError === null ? $redirect : $redirect->withErrors(['payment' => $paymentError]);

@@ -28,6 +28,7 @@ Execucao automatica de uma cobranca real durante testes locais. A primeira valid
 - Cartao exige nome impresso, numero, validade e codigo de seguranca validos, alem dos dados do titular e IP real do comprador.
 - Numero completo e codigo de seguranca existem apenas durante a requisicao: nao entram no pedido, sessao, banco, outbox ou logs.
 - Recusa HTTP 400 do cartao encerra o pagamento como recusado, cancela o pedido e libera a reserva sem inventar um ID de cobranca Asaas.
+- Recusa de cartao recria um carrinho ativo com os mesmos itens, devolve o uso do cupom e retorna ao checkout; numero e CVV sao limpos e precisam ser informados novamente.
 - O checkout valida a prontidao local do gateway antes de converter o carrinho. Integracao desabilitada ou chave invalida nao cria pedido, nao reserva estoque e preserva o carrinho.
 - Chaves de producao salvas como `aact_prod_...` por perda do caractere especial sao normalizadas para `$aact_prod_...` apenas no servidor antes do envio.
 - Falha transitoria persistida e exibida como indisponibilidade, sem manter a interface indefinidamente no estado "Gerando pagamento".
@@ -38,7 +39,7 @@ No checkout pago, `EnsurePaymentGatewayReady` valida a configuracao e, somente d
 
 ## Fluxos alternativos
 
-Timeout permanece retryable. Eventos informativos sao auditados sem alterar pedido. Estorno total atualiza pagamento e pedido; estorno parcial preserva o pedido pago e registra o valor devolvido; chargeback registra o estado financeiro sem alterar indevidamente a expedicao.
+Recusa de cartao mantem o token de sessao, arquiva o carrinho convertido ligado ao pedido cancelado e cria outro carrinho ativo para a nova tentativa. Timeout permanece retryable. Eventos informativos sao auditados sem alterar pedido. Estorno total atualiza pagamento e pedido; estorno parcial preserva o pedido pago e registra o valor devolvido; chargeback registra o estado financeiro sem alterar indevidamente a expedicao.
 
 ## Casos de uso
 
@@ -50,7 +51,7 @@ Timeout permanece retryable. Eventos informativos sao auditados sem alterar pedi
 
 ## Portas e adaptadores
 
-`PaymentGatewayReadiness` isola a validacao de configuracao. HTTP do Laravel para Asaas; persistencia SQL para clientes e inbox; portas de Ordering e Inventory para efeitos locais.
+`PaymentGatewayReadiness` isola a validacao de configuracao. HTTP do Laravel para Asaas; persistencia SQL para clientes e inbox; portas de Ordering, Cart e Inventory para efeitos locais. `CouponGateway::release` devolve atomicamente o uso consumido pela tentativa recusada.
 
 ## Persistencia
 
@@ -58,7 +59,7 @@ Timeout permanece retryable. Eventos informativos sao auditados sem alterar pedi
 
 ## Transacoes
 
-Rede ocorre fora da transacao. Pedido, pagamento e estoque mudam juntos depois do lock.
+Rede ocorre fora da transacao. Na recusa, pedido, pagamento, estoque, cupom e recuperacao do carrinho mudam juntos depois do lock.
 
 ## Idempotencia
 
@@ -66,7 +67,7 @@ Referencia externa do pedido, ID do evento, fingerprint da reconciliacao e trans
 
 ## Seguranca
 
-Chave e token ficam no ambiente. Webhook usa `asaas-access-token`, comparacao constante, limite de requisicoes e exclusao CSRF apenas na rota dedicada. HTTPS e obrigatorio para cartao. Numero e CVV sao excluidos do flash de validacao, os parametros sao marcados como sensiveis e recusas nao encadeiam excecoes HTTP que poderiam carregar contexto sensivel.
+Chave e token ficam no ambiente. Webhook usa `asaas-access-token`, comparacao constante, limite de requisicoes e exclusao CSRF apenas na rota dedicada. HTTPS e obrigatorio para cartao. Numero e CVV sao excluidos do flash de validacao, limpos no navegador apos recusa, marcados como sensiveis e nunca persistidos ou encadeados em excecoes HTTP.
 
 ## Eventos
 
@@ -74,7 +75,7 @@ Somente eventos de cobrancas selecionados no Asaas sao aceitos e novos campos de
 
 ## Interface
 
-A URL publica configurada e `https://fabricafardamento.gejalabs.com.br/webhooks/asaas`. A pagina de confirmacao exibe QR Code, copia e cola, vencimento e atualiza o estado automaticamente. Quando existe falha persistida, mostra a indisponibilidade ou recusa e oculta o bloco enganoso de geracao. Ao escolher cartao, o checkout mostra nome impresso, numero, mes, ano e codigo de seguranca com feedback de validacao e processamento.
+A URL publica configurada e `https://fabricafardamento.gejalabs.com.br/webhooks/asaas`. A pagina de confirmacao exibe QR Code, copia e cola, vencimento e atualiza o estado automaticamente. Quando existe falha persistida, mostra a indisponibilidade e oculta o bloco enganoso de geracao. Cartao recusado volta diretamente ao formulario, preserva dados nao sensiveis e solicita novo numero e CVV.
 
 ## Testes automatizados
 

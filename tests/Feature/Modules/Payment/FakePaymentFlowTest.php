@@ -26,7 +26,7 @@ beforeEach(function () {
     config()->set('payment.gateway', 'fake');
 });
 
-function checkoutForFakePayment(int $stock = 3, int $quantity = 2, string $method = 'pix'): array
+function checkoutForFakePayment(int $stock = 3, int $quantity = 2, string $method = 'pix', ?string $coupon = null): array
 {
     $productId = (string) Str::uuid();
     ProductRecord::query()->create([
@@ -45,7 +45,7 @@ function checkoutForFakePayment(int $stock = 3, int $quantity = 2, string $metho
     app(CartRepository::class)->save($cart);
     $order = app(CheckoutCart::class)->handle((string) Str::uuid(), $token, new CheckoutData(
         'payment', 'Cliente Pagamento', 'pagamento@example.com', '11999999999', null,
-        '01001000', 'Rua Teste', '10', 'Sao Paulo', 'SP', 'pickup', $method, null, null, null,
+        '01001000', 'Rua Teste', '10', 'Sao Paulo', 'SP', 'pickup', $method, null, $coupon, null,
     ));
 
     return [$order, $productId];
@@ -80,7 +80,21 @@ it('declines payment definitively and releases the reservation', function () {
 });
 
 it('cancels a card order when Asaas refuses it without creating a provider charge', function () {
-    [$order, $productId] = checkoutForFakePayment(method: 'credit_card');
+    DB::table('commerce_coupons')->insert([
+        'id' => (string) Str::uuid(),
+        'code' => 'RETRY10',
+        'description' => 'Cupom recuperavel',
+        'discount_type' => 'percent',
+        'discount_value' => 10,
+        'minimum_amount' => 0,
+        'usage_limit' => 1,
+        'used_count' => 0,
+        'is_active' => true,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+    [$order, $productId] = checkoutForFakePayment(method: 'credit_card', coupon: 'RETRY10');
+    $this->assertDatabaseHas('commerce_coupons', ['code' => 'RETRY10', 'used_count' => 1]);
     $gateway = Mockery::mock(PaymentGateway::class);
     $gateway->shouldReceive('charge')->once()->andThrow(new PaymentCardDeclined('Cartao recusado.'));
     app()->instance(PaymentGateway::class, $gateway);
@@ -96,6 +110,9 @@ it('cancels a card order when Asaas refuses it without creating a provider charg
     ]);
     $this->assertDatabaseHas('ordering_orders', ['id' => $order->id, 'status' => 'cancelled', 'payment_status' => 'refused']);
     $this->assertDatabaseHas('inventory_stock_levels', ['product_id' => $productId, 'on_hand' => 3, 'reserved' => 0]);
+    $this->assertDatabaseHas('commerce_coupons', ['code' => 'RETRY10', 'used_count' => 0]);
+    expect(DB::table('cart_carts')->where('status', 'active')->count())->toBe(1)
+        ->and(DB::table('cart_items')->whereIn('cart_id', DB::table('cart_carts')->where('status', 'active')->select('id'))->count())->toBe(1);
 });
 
 it('keeps timeout retryable without duplicating the provider charge', function () {

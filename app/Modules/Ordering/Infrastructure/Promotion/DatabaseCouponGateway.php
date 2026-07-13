@@ -64,4 +64,24 @@ final readonly class DatabaseCouponGateway implements CouponGateway
             return new CouponDiscount((string) $coupon->code, min($subtotalAmount, $discountAmount));
         }, 3);
     }
+
+    public function release(string $code): void
+    {
+        $normalized = strtoupper(trim($code));
+        if ($normalized === '') {
+            return;
+        }
+
+        $this->database->transaction(function () use ($normalized): void {
+            $coupon = $this->database->table('commerce_coupons')->where('code', $normalized)->lockForUpdate()->first();
+            if ($coupon === null || (int) $coupon->used_count < 1) {
+                return;
+            }
+
+            $this->database->table('commerce_coupons')->where('id', $coupon->id)->update([
+                'used_count' => (int) $coupon->used_count - 1,
+                'updated_at' => now(),
+            ]);
+        }, 3);
+    }
 }

@@ -2,7 +2,7 @@
 
 ## Decisao
 
-O checkout persiste a intencao e uma mensagem de outbox, mas nunca chama o gateway dentro da transacao. Um processador posterior realiza a chamada e aplica o resultado em uma nova transacao.
+O checkout persiste a intencao e a mensagem de outbox sem rede dentro da transacao. PIX e cartao tentam a cobranca imediatamente depois do commit; o processador da outbox permanece como fallback idempotente.
 
 ## Motivo
 
@@ -20,6 +20,7 @@ Gateways podem atrasar, falhar ou responder de forma ambigua. Manter locks duran
 - Chaves estaveis permitem retry sem nova cobranca.
 - Antes da conversao do carrinho, `EnsurePaymentGatewayReady` usa a porta `PaymentGatewayReadiness` para rejeitar configuracao local desabilitada ou invalida sem criar pedido parcial.
 - Uma falha apos o commit permanece `pending` com `failure_code`; a interface diferencia falha retryable de processamento ativo e o outbox pode tentar novamente.
+- Recusa definitiva de cartao cancela pedido e pagamento, libera estoque e cupom e substitui o carrinho convertido por um novo carrinho ativo com o mesmo token de sessao, tudo na mesma transacao local.
 
 ## Adaptabilidade
 

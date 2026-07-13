@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Modules\Payment\Application\Command;
 
+use App\Modules\Cart\Domain\Port\CartRepository;
 use App\Modules\Inventory\Application\Port\StockReservationLifecycle;
 use App\Modules\Inventory\Domain\Exception\ReservationConflict;
+use App\Modules\Ordering\Application\Port\CouponGateway;
 use App\Modules\Ordering\Domain\Order;
 use App\Modules\Ordering\Domain\Port\OrderRepository;
 use App\Modules\Payment\Application\DTO\CreditCardData;
@@ -29,6 +31,8 @@ final readonly class ProcessPayment
         private PaymentGateway $gateway,
         private PaymentInstructionStore $instructions,
         private OrderRepository $orders,
+        private CartRepository $carts,
+        private CouponGateway $coupons,
         private StockReservationLifecycle $reservations,
         private TransactionManager $transactions,
     ) {}
@@ -61,6 +65,10 @@ final readonly class ProcessPayment
         } catch (PaymentCardDeclined $exception) {
             $this->transactions->run(function () use ($payment, $order, $attemptId): void {
                 $this->transitionReservations($payment, $order, false);
+                $this->carts->restoreAfterFailedCheckout($order->cartId);
+                if ($order->details()->couponCode !== null) {
+                    $this->coupons->release($order->details()->couponCode);
+                }
                 $payment->declineWithoutProvider();
                 $order->cancelAfterPaymentFailure();
                 $this->payments->save($payment, 'card_declined');

@@ -11,6 +11,7 @@ use App\Modules\Cart\Domain\Port\CartRepository;
 use App\Modules\Shared\Domain\ValueObject\Money;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Database\QueryException;
+use Ramsey\Uuid\Uuid;
 
 final readonly class DatabaseCartRepository implements CartRepository
 {
@@ -82,6 +83,58 @@ final readonly class DatabaseCartRepository implements CartRepository
         }
 
         $cart->markPersisted();
+    }
+
+    public function restoreAfterFailedCheckout(string $cartId): void
+    {
+        $this->database->transaction(function () use ($cartId): void {
+            $cart = $this->database->table('cart_carts')
+                ->where('id', $cartId)
+                ->where('status', 'converted')
+                ->lockForUpdate()
+                ->first();
+
+            if ($cart === null) {
+                throw new CartConcurrencyConflict('Converted cart could not be restored after payment failure.');
+            }
+
+            $tokenHash = (string) $cart->token_hash;
+            $newCartId = (string) Uuid::uuid4();
+            $this->database->table('cart_carts')->where('id', $cartId)->update([
+                'token_hash' => hash('sha256', 'converted:'.$cartId),
+                'version' => (int) $cart->version + 1,
+                'updated_at' => now(),
+            ]);
+            $this->database->table('cart_carts')->insert([
+                'id' => $newCartId,
+                'token_hash' => $tokenHash,
+                'currency' => (string) $cart->currency,
+                'status' => 'active',
+                'version' => 1,
+                'expires_at' => now()->addDays(30),
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            foreach ($this->database->table('cart_items')->where('cart_id', $cartId)->orderBy('id')->get() as $item) {
+                $this->database->table('cart_items')->insert([
+                    'cart_id' => $newCartId,
+                    'product_id' => $item->product_id,
+                    'cart_item_key' => $item->cart_item_key,
+                    'variation_key' => $item->variation_key,
+                    'variation_label' => $item->variation_label,
+                    'notes' => $item->notes,
+                    'sku' => $item->sku,
+                    'name' => $item->name,
+                    'unit_price_amount' => $item->unit_price_amount,
+                    'price_currency' => $item->price_currency,
+                    'quantity' => $item->quantity,
+                    'image_url' => $item->image_url,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+        }, 3);
     }
 
     private function persistVersion(Cart $cart): void

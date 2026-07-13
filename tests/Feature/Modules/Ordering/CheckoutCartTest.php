@@ -439,3 +439,67 @@ it('processes a credit card immediately without persisting sensitive card data',
         && $request['creditCard']['ccv'] === '318'
         && $request['remoteIp'] === '203.0.113.20');
 });
+
+it('restores the cart and returns to checkout when Asaas declines the card', function () {
+    config()->set('payment.gateway', 'asaas');
+    config()->set('payment.asaas.live_enabled', true);
+    config()->set('payment.asaas.base_url', 'https://api.asaas.com/v3');
+    config()->set('payment.asaas.api_key', '$aact_prod_test_only');
+    Http::fake([
+        'https://api.asaas.com/v3/payments?*' => Http::response(['data' => []]),
+        'https://api.asaas.com/v3/customers' => Http::response(['id' => 'cus_checkout_declined']),
+        'https://api.asaas.com/v3/payments' => Http::response([
+            'errors' => [['code' => 'invalid_credit_card', 'description' => 'Cartao recusado']],
+        ], 400),
+    ]);
+    $productId = (string) Str::uuid();
+    ProductRecord::query()->create([
+        'id' => $productId,
+        'sku' => 'CARD-DECLINED-001',
+        'name' => 'Produto Cartao Recusado',
+        'description' => '',
+        'price_amount' => 7500,
+        'price_currency' => 'BRL',
+        'status' => 'active',
+    ]);
+    app(DatabaseStockGateway::class)->receive('card-declined-stock', $productId, 1);
+    $token = 'card-declined-cart-token';
+    $cart = new Cart((string) Str::uuid(), hash('sha256', $token));
+    $cart->add($productId, 'Produto Cartao Recusado', new Money(7500), 1, 'CARD-DECLINED-001');
+    app(CartRepository::class)->save($cart);
+
+    $response = $this->withServerVariables(['REMOTE_ADDR' => '203.0.113.21'])
+        ->withSession(['cart_token' => $token])
+        ->post(route('checkout.store'), [
+            'customerName' => 'Cliente Recusado',
+            'customerEmail' => 'recusado@example.com',
+            'customerPhone' => '(11) 99999-9999',
+            'customerDocument' => '123.456.789-09',
+            'shippingZip' => '01001-000',
+            'shippingAddress' => 'Rua Cartao',
+            'shippingNumber' => '10',
+            'shippingCity' => 'Sao Paulo',
+            'shippingState' => 'SP',
+            'checkoutType' => 'payment',
+            'deliveryMethod' => 'pickup',
+            'paymentMethod' => 'credit_card',
+            'cardHolderName' => 'CLIENTE RECUSADO',
+            'cardNumber' => '5162306219378829',
+            'cardExpiryMonth' => '05',
+            'cardExpiryYear' => '2030',
+            'cardCcv' => '318',
+            'privacyAccepted' => true,
+        ], ['Idempotency-Key' => (string) Str::uuid()]);
+
+    $response->assertRedirect(route('checkout'))
+        ->assertSessionHasErrors('cardNumber')
+        ->assertSessionHas('cart_token', $token)
+        ->assertSessionMissing('_old_input.cardNumber')
+        ->assertSessionMissing('_old_input.cardCcv');
+    $this->assertDatabaseHas('ordering_orders', ['cart_id' => $cart->id, 'status' => 'cancelled', 'payment_status' => 'refused']);
+    $this->assertDatabaseHas('payment_payments', ['status' => 'declined', 'provider_payment_id' => null]);
+    $this->assertDatabaseHas('cart_carts', ['id' => $cart->id, 'status' => 'converted']);
+    $this->assertDatabaseHas('cart_carts', ['token_hash' => hash('sha256', $token), 'status' => 'active']);
+    $this->assertDatabaseHas('inventory_stock_levels', ['product_id' => $productId, 'on_hand' => 1, 'reserved' => 0]);
+    $this->withSession(['cart_token' => $token])->get(route('checkout'))->assertOk();
+});
