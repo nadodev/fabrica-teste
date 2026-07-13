@@ -13,6 +13,8 @@ use Illuminate\Support\Carbon;
  * @property int $id
  * @property string $name
  * @property string $email
+ * @property string|null $phone
+ * @property string|null $document
  * @property Carbon|null $email_verified_at
  * @property string $password
  * @property string|null $remember_token
@@ -26,7 +28,7 @@ class User extends Authenticatable
     use HasFactory, Notifiable;
 
     /** @var list<string> */
-    protected $fillable = ['name', 'email', 'password', 'is_admin'];
+    protected $fillable = ['name', 'email', 'phone', 'document', 'password', 'is_admin'];
 
     /** @var list<string> */
     protected $hidden = ['password', 'remember_token'];

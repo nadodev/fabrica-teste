@@ -37,7 +37,7 @@ final class CheckoutRequest extends FormRequest
             'shippingCity' => ['required', 'string', 'max:120'],
             'shippingState' => ['required', 'string', 'size:2'],
             'checkoutType' => ['required', 'in:quote,payment'],
-            'deliveryMethod' => ['required', 'in:shipping,pickup'],
+            'deliveryMethod' => ['required', 'in:shipping'],
             'paymentMethod' => ['required', Rule::in([...$settings->enabledPaymentMethods(), 'combine'])],
             'cardHolderName' => [Rule::requiredIf($requiresCard), 'nullable', 'string', 'min:2', 'max:100'],
             'cardNumber' => [Rule::requiredIf($requiresCard), 'nullable', 'string', 'regex:/^\d{13,19}$/'],

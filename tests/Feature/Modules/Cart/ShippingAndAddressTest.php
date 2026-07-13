@@ -206,7 +206,12 @@ it('saves shipping settings without accepting a database token', function () {
         'environment' => 'production',
         'originZip' => '89600-000',
         'token' => 'must-not-be-persisted',
-        'options' => ['pickupEnabled' => true],
+        'options' => [
+            'pickupEnabled' => true,
+            'freeShippingEnabled' => true,
+            'freeShippingMinimum' => '150.00',
+            'estimatedDays' => '4',
+        ],
     ], ['Idempotency-Key' => 'shipping-environment-token'])
         ->assertSessionHasNoErrors();
 
@@ -216,6 +221,10 @@ it('saves shipping settings without accepting a database token', function () {
         'environment' => 'production',
         'origin_zip' => '89600000',
     ]);
+    $options = json_decode((string) DB::table('shipping_settings')->where('id', 1)->value('options'), true);
+    expect($options)->not->toHaveKey('pickupEnabled')
+        ->and($options['freeShippingEnabled'])->toBeTrue()
+        ->and($options['freeShippingMinimum'])->toBe('150.00');
     expect(Schema::hasColumn('shipping_settings', 'token'))->toBeFalse();
 });
 

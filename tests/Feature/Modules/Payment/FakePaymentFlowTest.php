@@ -45,7 +45,13 @@ function checkoutForFakePayment(int $stock = 3, int $quantity = 2, string $metho
     app(CartRepository::class)->save($cart);
     $order = app(CheckoutCart::class)->handle((string) Str::uuid(), $token, new CheckoutData(
         'payment', 'Cliente Pagamento', 'pagamento@example.com', '11999999999', null,
-        '01001000', 'Rua Teste', '10', 'Sao Paulo', 'SP', 'pickup', $method, null, $coupon, null,
+        '01001000', 'Rua Teste', '10', 'Sao Paulo', 'SP', 'shipping', $method, null, $coupon, [
+            'serviceId' => 'test-shipping',
+            'name' => 'Entrega teste',
+            'companyName' => 'Transportadora teste',
+            'priceAmount' => 0,
+            'deliveryTime' => 2,
+        ],
     ));
 
     return [$order, $productId];

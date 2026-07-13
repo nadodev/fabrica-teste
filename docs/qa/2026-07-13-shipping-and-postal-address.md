@@ -21,6 +21,7 @@ Automatizado local com SQLite e HTTP simulado; validacao real de producao depend
 - SHIP-01: cotacao usa `https://melhorenvio.com.br`, Bearer e User-Agent; obtido conforme esperado; OK.
 - SHIP-02: CEP valido preenche logradouro, cidade e UF; obtido conforme esperado; OK.
 - SHIP-03: token vem somente da configuracao, nao aparece no HTML/Inertia e nao existe coluna de token no banco; obtido conforme esperado; OK.
+- SHIP-03A: frete gratis habilitado com minimo atingido; carrinho e checkout recebem opcao gratuita automaticamente; obtido conforme esperado; OK.
 
 ## Casos de validacao
 
@@ -31,6 +32,9 @@ Automatizado local com SQLite e HTTP simulado; validacao real de producao depend
 - SHIP-05C: token e CEP ausentes durante cotacao; adaptador retorna mensagens distintas e acionaveis; obtido conforme esperado; OK.
 - SHIP-05D: executar `shipping:diagnose`; comando confirma os estados sem imprimir o token; obtido conforme esperado; OK.
 - SHIP-05E: executar `shipping:diagnose --verify` com resposta autenticada; comando confirma acesso no ambiente de produção sem imprimir token ou dados da conta; obtido conforme esperado; OK.
+- SHIP-05F: abrir checkout sem frete selecionado; servidor redireciona ao carrinho com erro; obtido conforme esperado; OK.
+- SHIP-05G: enviar `deliveryMethod=pickup`; validacao recusa o novo pedido; obtido conforme esperado; OK.
+- SHIP-05H: frete gratis habilitado abaixo do minimo; checkout continua bloqueado; obtido conforme esperado; OK.
 
 ## Casos de autorizacao
 
@@ -53,10 +57,11 @@ Nao aplicavel a consultas somente leitura.
 ## Casos de regressao
 
 - SHIP-10: checkout aceita telefone, documento e CEP mascarados; coberto por teste de checkout.
+- SHIP-10A: opcao de retirada nao aparece no checkout nem no painel de frete; obtido conforme esperado; OK.
 
 ## Casos responsivos
 
-- SHIP-11: mascaras e mensagens permanecem dentro dos campos em celular e desktop; revisao estrutural concluida, validacao visual publicada pendente.
+- SHIP-11: carrinho bloqueado, frete gratis e checkout somente com entrega permanecem responsivos em viewport movel; validacao visual concluida sem rolagem horizontal; OK.
 
 ## Casos de acessibilidade
 
@@ -64,7 +69,7 @@ Nao aplicavel a consultas somente leitura.
 
 ## Evidencias
 
-Suite focada com 13 testes e 43 assercoes; suite completa com 77 testes e 468 assercoes; PHPStan, Pint, ESLint, TypeScript, Prettier e build aprovados.
+Suite completa com 89 testes e 557 assercoes; PHPStan, Pint, ESLint, TypeScript, Prettier e build aprovados. QA visual confirmou bloqueio sem frete, redirecionamento do checkout direto, frete gratis automatico, ausencia de retirada e console sem erros.
 
 ## Riscos conhecidos
 

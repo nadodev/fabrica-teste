@@ -17,7 +17,7 @@ Data: 2026-07-13
 ## QA manual orientado
 
 1. Adicionar um produto ativo e com estoque ao carrinho.
-2. Selecionar entrega ou retirada, aplicar cupom quando aplicavel e abrir o checkout.
+2. Calcular e selecionar uma entrega, aplicar cupom quando aplicavel e abrir o checkout.
 3. Finalizar uma vez e confirmar o numero publico na pagina de sucesso.
 4. Conferir no painel que cliente, endereco, itens, frete, cupom e total correspondem ao checkout.
 5. Executar `php artisan outbox:process-orders` e conferir a notificacao no mailer do ambiente.

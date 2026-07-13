@@ -6,10 +6,10 @@ import {
     CheckCircle2,
     CreditCard,
     FileText,
+    MapPin,
     PackageCheck,
+    Plus,
     ShieldCheck,
-    Store,
-    Truck,
     WalletCards,
     Zap,
 } from 'lucide-react';
@@ -80,6 +80,23 @@ type PostalAddressResponse = {
     state: string;
     message?: string;
 };
+type CustomerProfile = {
+    name: string;
+    email: string;
+    phone: string;
+    document: string;
+};
+type SavedAddress = {
+    id: string;
+    type: 'personal' | 'shipping';
+    label: string;
+    postalCode: string;
+    street: string;
+    number: string;
+    city: string;
+    state: string;
+    isDefault: boolean;
+};
 
 export default function Checkout({
     cart = emptyCart,
@@ -87,28 +104,41 @@ export default function Checkout({
     paymentMethods = ['pix', 'credit_card', 'boleto'],
     customerSettings = {},
     policySettings = {},
+    customer = null,
+    savedAddresses = [],
 }: {
     cart?: Cart;
     shippingZip?: string;
     paymentMethods?: string[];
     customerSettings?: CustomerSettings;
     policySettings?: PolicySettings;
+    customer?: CustomerProfile | null;
+    savedAddresses?: SavedAddress[];
 }) {
     const safeCart = {
         ...emptyCart,
         ...cart,
         items: Array.isArray(cart?.items) ? cart.items : [],
     };
+    const safeAddresses = Array.isArray(savedAddresses) ? savedAddresses : [];
+    const preferredAddress =
+        safeAddresses.find(
+            (address) => address.type === 'shipping' && address.isDefault,
+        ) ??
+        safeAddresses.find((address) => address.isDefault) ??
+        safeAddresses[0];
     const form = useForm({
-        customerName: '',
-        customerEmail: '',
-        customerPhone: '',
-        customerDocument: '',
-        shippingZip: formatPostalCode(shippingZip ?? ''),
-        shippingAddress: '',
-        shippingNumber: '',
-        shippingCity: '',
-        shippingState: '',
+        customerName: customer?.name ?? '',
+        customerEmail: customer?.email ?? '',
+        customerPhone: formatPhone(customer?.phone ?? ''),
+        customerDocument: formatDocument(customer?.document ?? ''),
+        shippingZip: formatPostalCode(
+            preferredAddress?.postalCode || shippingZip || '',
+        ),
+        shippingAddress: preferredAddress?.street ?? '',
+        shippingNumber: preferredAddress?.number ?? '',
+        shippingCity: preferredAddress?.city ?? '',
+        shippingState: preferredAddress?.state ?? '',
         checkoutType: paymentMethods.length > 0 ? 'payment' : 'quote',
         deliveryMethod: 'shipping',
         paymentMethod: paymentMethods[0] ?? 'combine',
@@ -126,6 +156,9 @@ export default function Checkout({
         status: 'idle' | 'loading' | 'success' | 'error';
         message: string;
     }>({ status: 'idle', message: '' });
+    const [selectedAddressId, setSelectedAddressId] = useState(
+        preferredAddress?.id ?? '',
+    );
     const lastLookupZip = useRef('');
     const addressRequest = useRef(0);
     const shippingNumberInput = useRef<HTMLInputElement>(null);
@@ -209,6 +242,35 @@ export default function Checkout({
                 cardCcv: '',
             }));
         }
+    };
+
+    const selectAddress = (addressId: string) => {
+        setSelectedAddressId(addressId);
+
+        const address = safeAddresses.find((item) => item.id === addressId);
+
+        if (!address) {
+            form.setData((current) => ({
+                ...current,
+                shippingZip: '',
+                shippingAddress: '',
+                shippingNumber: '',
+                shippingCity: '',
+                shippingState: '',
+            }));
+
+            return;
+        }
+
+        form.setData((current) => ({
+            ...current,
+            shippingZip: formatPostalCode(address.postalCode),
+            shippingAddress: address.street,
+            shippingNumber: address.number,
+            shippingCity: address.city,
+            shippingState: address.state,
+        }));
+        setAddressLookup({ status: 'idle', message: '' });
     };
 
     const submit = (event: FormEvent) => {
@@ -297,9 +359,10 @@ export default function Checkout({
                                 error={form.errors.customerName}
                             >
                                 <input
-                                    className="input"
+                                    className={`input ${customer ? 'bg-bg-soft' : ''}`}
                                     autoComplete="name"
                                     placeholder="Nome e sobrenome"
+                                    readOnly={customer !== null}
                                     value={form.data.customerName}
                                     onChange={(e) =>
                                         form.setData(
@@ -315,9 +378,10 @@ export default function Checkout({
                             >
                                 <input
                                     type="email"
-                                    className="input"
+                                    className={`input ${customer ? 'bg-bg-soft' : ''}`}
                                     autoComplete="email"
                                     placeholder="voce@exemplo.com.br"
+                                    readOnly={customer !== null}
                                     value={form.data.customerEmail}
                                     onChange={(e) =>
                                         form.setData(
@@ -371,82 +435,83 @@ export default function Checkout({
                     <section className="rounded-2xl border border-border bg-white p-5 shadow-[var(--shadow-soft)] md:p-6">
                         <SectionHeading
                             step="2"
-                            title="Como você quer receber?"
-                            description="Escolha envio ou retirada e confirme o endereço abaixo."
+                            title="Endereço de entrega"
+                            description="Confirme onde o pedido deve ser entregue."
                         />
-                        <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                            <label
-                                className={`relative flex cursor-pointer gap-3 rounded-xl border-2 p-4 transition ${form.data.deliveryMethod === 'shipping' ? 'border-navy bg-bg-soft shadow-sm' : 'border-border hover:border-navy/40'}`}
-                            >
-                                <input
-                                    type="radio"
-                                    className="sr-only"
-                                    checked={
-                                        form.data.deliveryMethod === 'shipping'
-                                    }
-                                    onChange={() =>
-                                        form.setData(
-                                            'deliveryMethod',
-                                            'shipping',
-                                        )
-                                    }
-                                />
-                                <Truck className="h-5 w-5 shrink-0 text-navy" />
+                        {safeCart.shipping && (
+                            <div className="mt-5 flex items-center gap-3 rounded-xl bg-green-50 p-3 text-sm text-green-900">
+                                <PackageCheck className="h-5 w-5 shrink-0" />
                                 <span>
-                                    <strong className="block text-sm text-navy">
-                                        Enviar para meu endereço
-                                    </strong>
-                                    <span className="mt-1 block text-xs text-text-muted">
-                                        Receba pela transportadora escolhida no
-                                        carrinho.
-                                    </span>
+                                    <strong>{safeCart.shipping.name}</strong>{' '}
+                                    por {safeCart.shipping.companyName}
+                                    {safeCart.shipping.deliveryTime > 0
+                                        ? ` · até ${safeCart.shipping.deliveryTime} dias úteis`
+                                        : ''}
                                 </span>
-                                {form.data.deliveryMethod === 'shipping' && (
-                                    <Check className="ml-auto h-5 w-5 shrink-0 text-navy" />
-                                )}
-                            </label>
-                            <label
-                                className={`relative flex cursor-pointer gap-3 rounded-xl border-2 p-4 transition ${form.data.deliveryMethod === 'pickup' ? 'border-navy bg-bg-soft shadow-sm' : 'border-border hover:border-navy/40'}`}
-                            >
-                                <input
-                                    type="radio"
-                                    className="sr-only"
-                                    checked={
-                                        form.data.deliveryMethod === 'pickup'
-                                    }
-                                    onChange={() =>
-                                        form.setData('deliveryMethod', 'pickup')
-                                    }
-                                />
-                                <Store className="h-5 w-5 shrink-0 text-navy" />
-                                <span>
-                                    <strong className="block text-sm text-navy">
-                                        Retirar na loja
-                                    </strong>
-                                    <span className="mt-1 block text-xs text-text-muted">
-                                        Combinaremos a unidade e o horário após
-                                        a confirmação.
-                                    </span>
-                                </span>
-                                {form.data.deliveryMethod === 'pickup' && (
-                                    <Check className="ml-auto h-5 w-5 shrink-0 text-navy" />
-                                )}
-                            </label>
-                        </div>
-                        {form.data.deliveryMethod === 'shipping' &&
-                            safeCart.shipping && (
-                                <div className="mt-4 flex items-center gap-3 rounded-xl bg-green-50 p-3 text-sm text-green-900">
-                                    <PackageCheck className="h-5 w-5 shrink-0" />
-                                    <span>
-                                        <strong>
-                                            {safeCart.shipping.name}
-                                        </strong>{' '}
-                                        por {safeCart.shipping.companyName} ·
-                                        até {safeCart.shipping.deliveryTime}{' '}
-                                        dias úteis
-                                    </span>
+                            </div>
+                        )}
+                        {safeAddresses.length > 0 && (
+                            <fieldset className="mt-5">
+                                <legend className="text-sm font-black text-navy">
+                                    Escolha um endereço cadastrado
+                                </legend>
+                                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                                    {safeAddresses.map((address) => (
+                                        <label
+                                            key={address.id}
+                                            className={`flex cursor-pointer items-start gap-3 rounded-xl border-2 p-3 transition ${selectedAddressId === address.id ? 'border-navy bg-bg-soft' : 'border-border hover:border-navy/40'}`}
+                                        >
+                                            <input
+                                                type="radio"
+                                                name="savedAddress"
+                                                className="sr-only"
+                                                checked={
+                                                    selectedAddressId ===
+                                                    address.id
+                                                }
+                                                onChange={() =>
+                                                    selectAddress(address.id)
+                                                }
+                                            />
+                                            <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-navy" />
+                                            <span className="min-w-0 flex-1">
+                                                <strong className="block text-sm text-navy">
+                                                    {address.label}
+                                                    {address.isDefault
+                                                        ? ' · Padrão'
+                                                        : ''}
+                                                </strong>
+                                                <span className="mt-0.5 block text-xs text-text-muted">
+                                                    {address.street},{' '}
+                                                    {address.number} ·{' '}
+                                                    {address.city}/
+                                                    {address.state}
+                                                </span>
+                                            </span>
+                                            {selectedAddressId ===
+                                                address.id && (
+                                                <Check className="h-4 w-4 shrink-0 text-navy" />
+                                            )}
+                                        </label>
+                                    ))}
+                                    <label
+                                        className={`flex cursor-pointer items-center gap-3 rounded-xl border-2 p-3 transition ${selectedAddressId === '' ? 'border-navy bg-bg-soft' : 'border-border hover:border-navy/40'}`}
+                                    >
+                                        <input
+                                            type="radio"
+                                            name="savedAddress"
+                                            className="sr-only"
+                                            checked={selectedAddressId === ''}
+                                            onChange={() => selectAddress('')}
+                                        />
+                                        <Plus className="h-4 w-4 text-navy" />
+                                        <strong className="text-sm text-navy">
+                                            Preencher outro endereço
+                                        </strong>
+                                    </label>
                                 </div>
-                            )}
+                            </fieldset>
+                        )}
                         <div className="mt-5 grid gap-4 sm:grid-cols-2">
                             <Field label="CEP" error={form.errors.shippingZip}>
                                 <input

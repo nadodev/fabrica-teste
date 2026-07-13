@@ -33,7 +33,6 @@ export default function AdminShipping({
             freeShippingMinimum: String(
                 shipping.options?.freeShippingMinimum ?? '',
             ),
-            pickupEnabled: Boolean(shipping.options?.pickupEnabled ?? true),
             fixedRateEnabled: Boolean(
                 shipping.options?.fixedRateEnabled ?? false,
             ),
@@ -177,9 +176,12 @@ export default function AdminShipping({
                                     }
                                 />
                             </Field>
-                            <Field label="Valor minimo para frete gratis">
+                            <Field label="Valor minimo para frete gratis (R$)">
                                 <input
                                     className="input"
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
                                     value={
                                         form.data.options
                                             .freeShippingMinimum as string
@@ -239,7 +241,7 @@ export default function AdminShipping({
                                 />
                             </Field>
                         </div>
-                        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                        <div className="mt-4 grid gap-3 sm:grid-cols-2">
                             <Toggle
                                 label="Frete gratis"
                                 checked={Boolean(
@@ -249,18 +251,6 @@ export default function AdminShipping({
                                     form.setData('options', {
                                         ...form.data.options,
                                         freeShippingEnabled: value,
-                                    })
-                                }
-                            />
-                            <Toggle
-                                label="Retirada no local"
-                                checked={Boolean(
-                                    form.data.options.pickupEnabled,
-                                )}
-                                onChange={(value) =>
-                                    form.setData('options', {
-                                        ...form.data.options,
-                                        pickupEnabled: value,
                                     })
                                 }
                             />

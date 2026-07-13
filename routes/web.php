@@ -2,7 +2,9 @@
 
 use App\Http\Controllers\AdminAuthController;
 use App\Http\Controllers\CustomerAccountController;
+use App\Http\Controllers\CustomerAddressController;
 use App\Http\Controllers\CustomerAuthController;
+use App\Http\Controllers\CustomerProfileController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\PublicSeoController;
 use App\Modules\Payment\Presentation\Http\AsaasWebhookController;
@@ -24,6 +26,12 @@ Route::middleware('guest')->group(function (): void {
 });
 Route::post('/sair', [CustomerAuthController::class, 'logout'])->middleware('auth')->name('cliente.logout');
 Route::get('/minha-conta', CustomerAccountController::class)->middleware('auth')->name('cliente.conta');
+Route::middleware(['auth', 'throttle:commerce'])->prefix('/minha-conta')->name('cliente.')->group(function (): void {
+    Route::put('/perfil', [CustomerProfileController::class, 'update'])->name('profile.update');
+    Route::post('/enderecos', [CustomerAddressController::class, 'store'])->name('addresses.store');
+    Route::put('/enderecos/{address}', [CustomerAddressController::class, 'update'])->whereUuid('address')->name('addresses.update');
+    Route::delete('/enderecos/{address}', [CustomerAddressController::class, 'destroy'])->whereUuid('address')->name('addresses.destroy');
+});
 
 Route::get('/', HomeController::class)->name('home');
 Route::get('/sitemap.xml', [PublicSeoController::class, 'sitemap'])->name('sitemap');

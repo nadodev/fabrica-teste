@@ -19,6 +19,7 @@ use App\Modules\Payment\Application\Command\CreatePaymentIntent;
 use App\Modules\Shared\Application\Port\OutboxStore;
 use App\Modules\Shared\Application\Port\TransactionManager;
 use App\Modules\Shared\Domain\ValueObject\Money;
+use App\Modules\Shipping\Application\Query\ResolveFreeShipping;
 use App\Support\StoreSettings;
 use DomainException;
 use Ramsey\Uuid\Uuid;
@@ -35,6 +36,7 @@ final readonly class CheckoutCart
         private TransactionManager $transactions,
         private StoreSettings $settings,
         private CreatePaymentIntent $createPayment,
+        private ResolveFreeShipping $freeShipping,
     ) {}
 
     public function handle(string $orderId, string $plainCartToken, CheckoutData $data): Order
@@ -62,20 +64,21 @@ final readonly class CheckoutCart
                 $discount = $this->coupons->consume($data->couponCode, $cart->total()->amount);
             }
 
-            $shippingAmount = 0;
-            $shippingService = null;
-            $shippingCompany = null;
-            $shippingDeliveryTime = null;
-            if ($data->deliveryMethod === 'shipping') {
-                $quote = $data->shippingQuote ?? throw new DomainException('Selecione uma opcao de frete valida.');
-                $shippingService = trim((string) ($quote['name'] ?? ''));
-                $shippingCompany = trim((string) ($quote['companyName'] ?? '')) ?: null;
-                $shippingAmount = max(0, (int) ($quote['priceAmount'] ?? -1));
-                $shippingDeliveryTime = max(0, (int) ($quote['deliveryTime'] ?? 0));
+            if ($data->deliveryMethod !== 'shipping') {
+                throw new DomainException('A entrega deve ser realizada por uma opcao de frete valida.');
+            }
 
-                if ($shippingService === '' || (int) ($quote['priceAmount'] ?? -1) < 0) {
-                    throw new DomainException('Selecione uma opcao de frete valida.');
-                }
+            $eligibleAmount = max(0, $cart->total()->amount - ($discount === null ? 0 : $discount->amount));
+            $quote = $this->freeShipping->handle($eligibleAmount)
+                ?? $data->shippingQuote
+                ?? throw new DomainException('Calcule e selecione uma opcao de frete antes de finalizar.');
+            $shippingService = trim((string) ($quote['name'] ?? ''));
+            $shippingCompany = trim((string) ($quote['companyName'] ?? '')) ?: null;
+            $shippingAmount = max(0, (int) ($quote['priceAmount'] ?? -1));
+            $shippingDeliveryTime = max(0, (int) ($quote['deliveryTime'] ?? 0));
+
+            if ($shippingService === '' || (int) ($quote['priceAmount'] ?? -1) < 0) {
+                throw new DomainException('Calcule e selecione uma opcao de frete antes de finalizar.');
             }
 
             $items = array_map(

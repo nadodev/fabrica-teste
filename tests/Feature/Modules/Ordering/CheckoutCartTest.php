@@ -40,7 +40,7 @@ it('atomically snapshots a cart, reserves stock and creates one order', function
     $checkout = app(CheckoutCart::class);
     $data = new CheckoutData(
         'payment', 'Cliente', 'cliente@example.com', '11999999999', null,
-        '01001000', 'Rua Teste', '10', 'Sao Paulo', 'SP', 'pickup', 'pix', null, null, null,
+        '01001000', 'Rua Teste', '10', 'Sao Paulo', 'SP', 'shipping', 'pix', null, null, checkoutShippingQuote(),
     );
     $order = $checkout->handle('0190f566-c399-79e3-a553-7e5fb8d83462', $token, $data);
     $replayed = $checkout->handle('0190f566-c399-79e3-a553-7e5fb8d83463', $token, $data);
@@ -141,7 +141,7 @@ it('rolls back coupon usage, order and outbox when stock reservation fails', fun
     app(CartRepository::class)->save($cart);
     $data = new CheckoutData(
         'payment', 'Cliente', 'cliente@example.com', '11999999999', null,
-        '01001000', 'Rua Teste', '10', 'Sao Paulo', 'SP', 'pickup', 'pix', null, 'ROLLBACK10', null,
+        '01001000', 'Rua Teste', '10', 'Sao Paulo', 'SP', 'shipping', 'pix', null, 'ROLLBACK10', checkoutShippingQuote(),
     );
 
     expect(fn () => app(CheckoutCart::class)->handle((string) Str::uuid(), $token, $data))
@@ -174,7 +174,7 @@ it('processes order email only after the outbox message exists', function () {
 
     $order = app(CheckoutCart::class)->handle((string) Str::uuid(), $token, new CheckoutData(
         'payment', 'Cliente Email', 'email@example.com', '11999999999', null,
-        '01001000', 'Rua Teste', '10', 'Sao Paulo', 'SP', 'pickup', 'pix', null, null, null,
+        '01001000', 'Rua Teste', '10', 'Sao Paulo', 'SP', 'shipping', 'pix', null, null, checkoutShippingQuote(),
     ));
 
     Mail::assertNothingSent();
@@ -201,7 +201,7 @@ it('maps the public checkout request to the transactional use case', function ()
     app(CartRepository::class)->save($cart);
 
     $user = User::factory()->create(['name' => 'Cliente Vinculado', 'email' => 'vinculado@example.com']);
-    $response = $this->actingAs($user)->withSession(['cart_token' => $token])->post(route('checkout.store'), [
+    $response = $this->actingAs($user)->withSession(['cart_token' => $token, 'shipping_quote' => checkoutShippingQuote()])->post(route('checkout.store'), [
         'customerName' => 'Nome adulterado',
         'customerEmail' => 'outro@example.com',
         'customerPhone' => '11999999999',
@@ -212,7 +212,7 @@ it('maps the public checkout request to the transactional use case', function ()
         'shippingCity' => 'Sao Paulo',
         'shippingState' => 'SP',
         'checkoutType' => 'payment',
-        'deliveryMethod' => 'pickup',
+        'deliveryMethod' => 'shipping',
         'paymentMethod' => 'pix',
         'privacyAccepted' => true,
     ], ['Idempotency-Key' => (string) Str::uuid()]);
@@ -224,7 +224,7 @@ it('maps the public checkout request to the transactional use case', function ()
         'customer_user_id' => $user->id,
         'customer_name' => 'Cliente Vinculado',
         'customer_email' => 'vinculado@example.com',
-        'delivery_method' => 'pickup',
+        'delivery_method' => 'shipping',
         'total_amount' => 8900,
     ]);
 });
@@ -248,7 +248,7 @@ it('keeps the cart active and does not create an order when Asaas is not ready',
     $cart->add($productId, 'Produto sem gateway', new Money(5000), 1, 'ASAAS-NOT-READY');
     app(CartRepository::class)->save($cart);
 
-    $response = $this->from(route('checkout'))->withSession(['cart_token' => $token])->post(route('checkout.store'), [
+    $response = $this->from(route('checkout'))->withSession(['cart_token' => $token, 'shipping_quote' => checkoutShippingQuote()])->post(route('checkout.store'), [
         'customerName' => 'Cliente Gateway',
         'customerEmail' => 'gateway@example.com',
         'customerPhone' => '11999999999',
@@ -259,7 +259,7 @@ it('keeps the cart active and does not create an order when Asaas is not ready',
         'shippingCity' => 'Sao Paulo',
         'shippingState' => 'SP',
         'checkoutType' => 'payment',
-        'deliveryMethod' => 'pickup',
+        'deliveryMethod' => 'shipping',
         'paymentMethod' => 'pix',
         'privacyAccepted' => true,
     ], ['Idempotency-Key' => (string) Str::uuid()]);
@@ -308,7 +308,7 @@ it('creates and securely displays Pix instructions immediately after checkout', 
     app(CartRepository::class)->save($cart);
     $user = User::factory()->create(['name' => 'Cliente PIX', 'email' => 'pix@example.com']);
 
-    $response = $this->actingAs($user)->withSession(['cart_token' => $token])->post(route('checkout.store'), [
+    $response = $this->actingAs($user)->withSession(['cart_token' => $token, 'shipping_quote' => checkoutShippingQuote()])->post(route('checkout.store'), [
         'customerName' => 'Cliente PIX',
         'customerEmail' => 'pix@example.com',
         'customerPhone' => '11999999999',
@@ -319,7 +319,7 @@ it('creates and securely displays Pix instructions immediately after checkout', 
         'shippingCity' => 'Sao Paulo',
         'shippingState' => 'SP',
         'checkoutType' => 'payment',
-        'deliveryMethod' => 'pickup',
+        'deliveryMethod' => 'shipping',
         'paymentMethod' => 'pix',
         'privacyAccepted' => true,
     ], ['Idempotency-Key' => (string) Str::uuid()]);
@@ -353,7 +353,7 @@ it('validates credit card fields without flashing the number or security code', 
         'shippingCity' => 'Sao Paulo',
         'shippingState' => 'SP',
         'checkoutType' => 'payment',
-        'deliveryMethod' => 'pickup',
+        'deliveryMethod' => 'shipping',
         'paymentMethod' => 'credit_card',
         'cardHolderName' => 'CLIENTE CARTAO',
         'cardNumber' => '111111111111111a',
@@ -403,7 +403,7 @@ it('processes a credit card immediately without persisting sensitive card data',
     app(CartRepository::class)->save($cart);
 
     $response = $this->withServerVariables(['REMOTE_ADDR' => '203.0.113.20'])
-        ->withSession(['cart_token' => $token])
+        ->withSession(['cart_token' => $token, 'shipping_quote' => checkoutShippingQuote()])
         ->post(route('checkout.store'), [
             'customerName' => 'Cliente Cartao',
             'customerEmail' => 'cartao@example.com',
@@ -415,7 +415,7 @@ it('processes a credit card immediately without persisting sensitive card data',
             'shippingCity' => 'Sao Paulo',
             'shippingState' => 'SP',
             'checkoutType' => 'payment',
-            'deliveryMethod' => 'pickup',
+            'deliveryMethod' => 'shipping',
             'paymentMethod' => 'credit_card',
             'cardHolderName' => 'CLIENTE CARTAO',
             'cardNumber' => '5162306219378829',
@@ -469,7 +469,7 @@ it('restores the cart and returns to checkout when Asaas declines the card', fun
     app(CartRepository::class)->save($cart);
 
     $response = $this->withServerVariables(['REMOTE_ADDR' => '203.0.113.21'])
-        ->withSession(['cart_token' => $token])
+        ->withSession(['cart_token' => $token, 'shipping_quote' => checkoutShippingQuote()])
         ->post(route('checkout.store'), [
             'customerName' => 'Cliente Recusado',
             'customerEmail' => 'recusado@example.com',
@@ -481,7 +481,7 @@ it('restores the cart and returns to checkout when Asaas declines the card', fun
             'shippingCity' => 'Sao Paulo',
             'shippingState' => 'SP',
             'checkoutType' => 'payment',
-            'deliveryMethod' => 'pickup',
+            'deliveryMethod' => 'shipping',
             'paymentMethod' => 'credit_card',
             'cardHolderName' => 'CLIENTE RECUSADO',
             'cardNumber' => '5162306219378829',
@@ -501,5 +501,17 @@ it('restores the cart and returns to checkout when Asaas declines the card', fun
     $this->assertDatabaseHas('cart_carts', ['id' => $cart->id, 'status' => 'converted']);
     $this->assertDatabaseHas('cart_carts', ['token_hash' => hash('sha256', $token), 'status' => 'active']);
     $this->assertDatabaseHas('inventory_stock_levels', ['product_id' => $productId, 'on_hand' => 1, 'reserved' => 0]);
-    $this->withSession(['cart_token' => $token])->get(route('checkout'))->assertOk();
+    $this->withSession(['cart_token' => $token, 'shipping_quote' => checkoutShippingQuote()])->get(route('checkout'))->assertOk();
 });
+
+/** @return array{serviceId: string, name: string, companyName: string, priceAmount: int, deliveryTime: int} */
+function checkoutShippingQuote(): array
+{
+    return [
+        'serviceId' => 'test-shipping',
+        'name' => 'Entrega teste',
+        'companyName' => 'Transportadora teste',
+        'priceAmount' => 0,
+        'deliveryTime' => 2,
+    ];
+}

@@ -7,6 +7,7 @@ namespace App\Modules\Ordering\Presentation\Http;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Modules\Cart\Application\Query\ShowCart;
+use App\Modules\Customers\Application\Query\ShowCustomerAccount;
 use App\Modules\Ordering\Application\Command\CheckoutCart;
 use App\Modules\Ordering\Application\DTO\CheckoutData;
 use App\Modules\Ordering\Presentation\Http\Request\CheckoutRequest;
@@ -28,7 +29,7 @@ use Throwable;
 
 final class CheckoutController extends Controller
 {
-    public function create(Request $request, ShowCart $cart): Response|RedirectResponse
+    public function create(Request $request, ShowCart $cart, ShowCustomerAccount $account): Response|RedirectResponse
     {
         $settings = app(StoreSettings::class);
         $customers = $settings->customers();
@@ -46,12 +47,21 @@ final class CheckoutController extends Controller
             return to_route('carrinho')->withErrors(['cart' => 'O valor minimo do pedido ainda nao foi atingido.']);
         }
 
+        if ($view->shipping === null) {
+            return to_route('carrinho')->withErrors(['shipping' => 'Calcule e selecione uma opcao de frete antes de finalizar.']);
+        }
+
+        $user = $request->user();
+        $customer = $user instanceof User ? $account->handle((int) $user->getAuthIdentifier()) : null;
+
         return Inertia::render('checkout', [
             'cart' => $view,
             'shippingZip' => $request->session()->get('shipping_zip'),
             'paymentMethods' => $settings->enabledPaymentMethods(),
             'customerSettings' => $customers,
             'policySettings' => $settings->policies(),
+            'customer' => $customer['profile'] ?? null,
+            'savedAddresses' => $customer['addresses'] ?? [],
         ]);
     }
 

@@ -36,6 +36,9 @@ final class AdminShippingController extends Controller
             'environment' => ['required', Rule::in(['sandbox', 'production'])],
             'originZip' => ['nullable', 'string', 'regex:/^(?:\D*\d){8}\D*$/'],
             'options' => ['nullable', 'array'],
+            'options.freeShippingEnabled' => ['nullable', 'boolean'],
+            'options.freeShippingMinimum' => ['nullable', 'decimal:0,2', 'min:0', 'max:1000000'],
+            'options.estimatedDays' => ['nullable', 'integer', 'min:0', 'max:365'],
         ]);
 
         if ((bool) $data['isEnabled'] && ! $this->tokenConfigured()) {
@@ -46,13 +49,16 @@ final class AdminShippingController extends Controller
             throw ValidationException::withMessages(['originZip' => 'Informe o CEP de origem antes de ativar o frete.']);
         }
 
+        $options = (array) ($data['options'] ?? []);
+        unset($options['pickupEnabled']);
+
         DB::table('shipping_settings')->updateOrInsert(
             ['id' => 1],
             [
                 'is_enabled' => (bool) $data['isEnabled'],
                 'environment' => (string) $data['environment'],
                 'origin_zip' => preg_replace('/\D+/', '', (string) ($data['originZip'] ?? '')),
-                'options' => json_encode($data['options'] ?? [], JSON_THROW_ON_ERROR),
+                'options' => json_encode($options, JSON_THROW_ON_ERROR),
                 'updated_at' => now(),
                 'created_at' => now(),
             ],

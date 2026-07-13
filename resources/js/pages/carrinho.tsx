@@ -72,7 +72,7 @@ export default function CartPage({
     shippingQuotes?: ShippingQuote[];
     shippingZip?: string;
 }) {
-    const { commerceSettings, siteSettings } = usePage<{
+    const { commerceSettings, siteSettings, errors } = usePage<{
         commerceSettings?: {
             promotions?: {
                 couponsEnabled?: boolean;
@@ -81,6 +81,7 @@ export default function CartPage({
             products?: { minQuantity?: number; maxQuantity?: number };
         };
         siteSettings?: { whatsapp?: string };
+        errors?: Record<string, string>;
     }>().props;
     const safeCart = {
         ...emptyCart,
@@ -100,7 +101,11 @@ export default function CartPage({
         minQuantity,
         Number(commerceSettings?.products?.maxQuantity ?? 100),
     );
-    const canCheckout = safeCart.totalAmount >= minimumOrderValue;
+    const minimumReached = safeCart.totalAmount >= minimumOrderValue;
+    const hasShipping = safeCart.shipping !== null;
+    const freeShippingApplied =
+        safeCart.shipping?.serviceId === 'free-shipping';
+    const canCheckout = minimumReached && hasShipping;
     const couponForm = useForm({ code: safeCart.coupon?.code ?? '' });
     const shippingForm = useForm({
         zip: formatPostalCode(shippingZip ?? ''),
@@ -401,9 +406,15 @@ export default function CartPage({
                                 )}
                             </form>
                         )}
+                        {freeShippingApplied && (
+                            <div className="mt-4 rounded-lg bg-green-50 p-3 text-sm font-bold text-green-800">
+                                Frete grátis aplicado conforme as configurações
+                                da loja.
+                            </div>
+                        )}
                         <form
                             onSubmit={quoteShipping}
-                            className="mt-4 rounded-lg bg-bg-soft p-3"
+                            className={`${freeShippingApplied ? 'hidden' : 'mt-4'} rounded-lg bg-bg-soft p-3`}
                         >
                             <label className="text-xs font-black tracking-wider text-navy uppercase">
                                 Calcular frete
@@ -437,17 +448,16 @@ export default function CartPage({
                                     {shippingForm.errors.zip}
                                 </div>
                             )}
-                            {(shippingForm.errors as Record<string, string>)
-                                .shipping && (
+                            {((shippingForm.errors as Record<string, string>)
+                                .shipping ??
+                                errors?.shipping) && (
                                 <div className="mt-2 text-xs font-semibold text-red-700">
-                                    {
-                                        (
-                                            shippingForm.errors as Record<
-                                                string,
-                                                string
-                                            >
-                                        ).shipping
-                                    }
+                                    {(
+                                        shippingForm.errors as Record<
+                                            string,
+                                            string
+                                        >
+                                    ).shipping ?? errors?.shipping}
                                 </div>
                             )}
                             {shippingQuotes.length > 0 && (
@@ -534,16 +544,18 @@ export default function CartPage({
                                     </strong>
                                 </div>
                             )}
-                            {safeCart.shippingAmount > 0 && (
+                            {safeCart.shipping && (
                                 <div className="flex items-center justify-between text-sm">
                                     <span className="text-text-muted">
                                         Frete
                                     </span>
                                     <strong className="text-navy">
-                                        {formatMoney(
-                                            safeCart.shippingAmount,
-                                            safeCart.currency,
-                                        )}
+                                        {safeCart.shippingAmount === 0
+                                            ? 'Grátis'
+                                            : formatMoney(
+                                                  safeCart.shippingAmount,
+                                                  safeCart.currency,
+                                              )}
                                     </strong>
                                 </div>
                             )}
@@ -559,10 +571,13 @@ export default function CartPage({
                         </div>
                         <p className="mt-2 flex gap-2 text-xs leading-5 text-text-muted">
                             <Truck className="mt-0.5 h-4 w-4 shrink-0 text-navy" />{' '}
-                            Calcule o frete para ver o valor total antes de
-                            finalizar.
+                            {hasShipping
+                                ? freeShippingApplied
+                                    ? 'Seu pedido recebeu frete grátis.'
+                                    : 'Frete calculado e selecionado.'
+                                : 'Calcule e selecione o frete para liberar a finalização.'}
                         </p>
-                        {!canCheckout && (
+                        {!minimumReached && (
                             <p className="mt-4 rounded-lg bg-yellow/25 p-3 text-xs font-bold text-navy">
                                 Pedido minimo:{' '}
                                 {formatMoney(
@@ -570,6 +585,12 @@ export default function CartPage({
                                     safeCart.currency,
                                 )}
                                 .
+                            </p>
+                        )}
+                        {minimumReached && !hasShipping && (
+                            <p className="mt-4 rounded-lg bg-yellow/25 p-3 text-xs font-bold text-navy">
+                                É obrigatório calcular e selecionar uma opção de
+                                frete antes de finalizar.
                             </p>
                         )}
                         {canCheckout ? (
@@ -581,7 +602,9 @@ export default function CartPage({
                             </Link>
                         ) : (
                             <span className="mt-5 block w-full cursor-not-allowed rounded-md bg-slate-200 py-3 text-center font-black text-slate-500">
-                                Valor minimo nao atingido
+                                {minimumReached
+                                    ? 'Selecione o frete para finalizar'
+                                    : 'Valor minimo nao atingido'}
                             </span>
                         )}
                         {whatsappNumber && (
