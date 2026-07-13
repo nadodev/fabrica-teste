@@ -5,12 +5,13 @@ declare(strict_types=1);
 namespace App\Modules\Catalog\Application\DTO;
 
 use App\Modules\Catalog\Domain\Product;
+use App\Modules\Inventory\Application\DTO\StockLevel;
 
 final readonly class ProductView
 {
     /**
-     * @param list<string> $galleryImages
-     * @param list<array<string, bool|int|string>> $variations
+     * @param  list<string>  $galleryImages
+     * @param  list<array<string, bool|int|string>>  $variations
      */
     public function __construct(
         public string $id,
@@ -25,10 +26,35 @@ final readonly class ProductView
         public array $variations,
         public string $status,
         public int $stockAvailable = 0,
+        public bool $canSellWithoutStock = false,
+        public bool $showStockAlerts = true,
     ) {}
 
-    public static function fromDomain(Product $product, int $stockAvailable = 0): self
+    /** @param list<StockLevel> $stockLevels */
+    public static function fromDomain(Product $product, array $stockLevels = [], bool $allowOutOfStock = false, bool $showStockAlerts = true): self
     {
+        $levels = [];
+        $stockAvailable = 0;
+        foreach ($stockLevels as $level) {
+            $levels[$level->variationKey ?? ''] = $level;
+            $stockAvailable += $level->available();
+        }
+        $variations = array_map(function (array $variation) use ($levels, $allowOutOfStock, $showStockAlerts): array {
+            $level = $levels[$variation['id']] ?? null;
+            $available = $level === null ? 0 : $level->available();
+            $sku = $level === null ? $variation['sku'] : $level->sku;
+            $threshold = $level === null ? 5 : $level->lowStockThreshold;
+
+            return [
+                ...$variation,
+                'sku' => $sku,
+                'stock' => $available,
+                'lowStockThreshold' => $threshold,
+                'purchasable' => $allowOutOfStock || $available > 0,
+                'lowStock' => $showStockAlerts && $available <= $threshold,
+            ];
+        }, $product->variations());
+
         return new self(
             $product->id->value,
             $product->sku->value,
@@ -39,9 +65,11 @@ final readonly class ProductView
             $product->price()->currency,
             $product->imageUrl(),
             $product->galleryImages(),
-            $product->variations(),
+            $variations,
             $product->status()->value,
-            $product->availableForDisplay($stockAvailable),
+            max($stockAvailable, 0),
+            $allowOutOfStock,
+            $showStockAlerts,
         );
     }
 }

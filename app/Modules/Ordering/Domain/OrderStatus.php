@@ -6,6 +6,7 @@ namespace App\Modules\Ordering\Domain;
 
 enum OrderStatus: string
 {
+    case QuoteRequested = 'quote_requested';
     case AwaitingPayment = 'awaiting_payment';
     case Paid = 'paid';
     case Processing = 'processing';

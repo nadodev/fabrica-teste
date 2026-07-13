@@ -115,7 +115,10 @@ final class AdminSiteContentController extends Controller
         return self::TYPES[$type];
     }
 
-    /** @param array{fields: list<string>} $config @return array<string, mixed> */
+    /**
+     * @param  array{table: string, title: string, image: bool, fields: list<string>}  $config
+     * @return array<string, mixed>
+     */
     private function validated(Request $request, string $type, array $config): array
     {
         $rules = ['is_active' => ['sometimes', 'boolean'], 'sort_order' => ['nullable', 'integer', 'min:0', 'max:100000']];

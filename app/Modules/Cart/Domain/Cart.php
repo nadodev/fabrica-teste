@@ -54,11 +54,59 @@ final class Cart
         unset($this->items[$productId]);
     }
 
+    public function updateQuantity(string $cartItemKey, int $quantity): void
+    {
+        if ($quantity < 1) {
+            $this->remove($cartItemKey);
+
+            return;
+        }
+
+        $current = $this->items[$cartItemKey] ?? null;
+
+        if ($current === null) {
+            return;
+        }
+
+        $this->items[$cartItemKey] = new CartItem(
+            $current->productId,
+            $current->cartItemKey,
+            $current->name,
+            $current->unitPrice,
+            $quantity,
+            $current->sku,
+            $current->imageUrl,
+            $current->variationKey,
+            $current->variationLabel,
+            $current->notes,
+        );
+    }
+
+    public function updateNotes(string $cartItemKey, ?string $notes): void
+    {
+        $current = $this->items[$cartItemKey] ?? null;
+
+        if ($current === null) {
+            return;
+        }
+
+        $this->items[$cartItemKey] = new CartItem(
+            $current->productId,
+            $current->cartItemKey,
+            $current->name,
+            $current->unitPrice,
+            $current->quantity,
+            $current->sku,
+            $current->imageUrl,
+            $current->variationKey,
+            $current->variationLabel,
+            $notes,
+        );
+    }
+
     public function quantityFor(string $productId, ?string $variationKey = null): int
     {
-        $item = $this->items[self::cartItemKey($productId, $variationKey)] ?? null;
-
-        return $item?->quantity ?? 0;
+        return $this->items[self::cartItemKey($productId, $variationKey)]->quantity ?? 0;
     }
 
     public static function cartItemKey(string $productId, ?string $variationKey = null): string

@@ -46,6 +46,7 @@ final readonly class DatabaseCartRepository implements CartRepository
                         'cart_item_key' => $item->cartItemKey,
                         'variation_key' => $item->variationKey,
                         'variation_label' => $item->variationLabel,
+                        'notes' => $item->notes,
                         'sku' => $item->sku,
                         'name' => $item->name,
                         'unit_price_amount' => $item->unitPrice->amount,
@@ -129,6 +130,7 @@ final readonly class DatabaseCartRepository implements CartRepository
                 $item->image_url === null ? null : (string) $item->image_url,
                 $item->variation_key === null ? null : (string) $item->variation_key,
                 $item->variation_label === null ? null : (string) $item->variation_label,
+                $item->notes === null ? null : (string) $item->notes,
             ))->all();
 
         return Cart::restore(

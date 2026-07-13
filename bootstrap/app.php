@@ -17,7 +17,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->redirectGuestsTo(fn (): string => route('admin.login'));
+        $middleware->validateCsrfTokens(except: ['webhooks/asaas']);
+        $middleware->redirectGuestsTo(fn (Request $request): string => $request->is('admin/*')
+            ? route('admin.login')
+            : route('cliente.login'));
 
         $middleware->alias([
             'admin' => EnsureUserIsAdmin::class,

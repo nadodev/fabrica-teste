@@ -1,6 +1,7 @@
 <?php
 
 use App\Modules\Ordering\Domain\Order;
+use App\Modules\Ordering\Domain\OrderDetails;
 use App\Modules\Ordering\Domain\OrderItem;
 use App\Modules\Ordering\Domain\Port\OrderRepository;
 use App\Modules\Shared\Domain\ValueObject\Money;
@@ -22,7 +23,11 @@ it('generates sequential public numbers and persists item snapshots', function (
     $number = $repository->nextIdentity();
     $order = Order::place('0190f566-c399-79e3-a553-7e5fb8d83451', $number, '0190f566-c399-79e3-a553-7e5fb8d83450', [
         new OrderItem('0190f566-c399-79e3-a553-7e5fb8d83440', 'SNAP-001', 'Nome no momento da compra', new Money(10990), 2),
-    ]);
+    ], new OrderDetails(
+        'payment', 'Cliente', 'cliente@example.com', '11999999999', null,
+        '01001000', 'Rua Teste', '10', 'Sao Paulo', 'SP', 'pickup', null, null,
+        new Money(0), null, 'pix', 'pending', null, null, new Money(0),
+    ));
     $repository->save($order);
 
     expect($number)->toBe('PED-00000001')

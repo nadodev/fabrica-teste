@@ -7,9 +7,12 @@ namespace App\Modules\Cart\Presentation\Http;
 use App\Http\Controllers\Controller;
 use App\Modules\Cart\Application\Command\AddItemToCart;
 use App\Modules\Cart\Application\Command\RemoveItemFromCart;
+use App\Modules\Cart\Application\Command\UpdateCartItemNotes;
+use App\Modules\Cart\Application\Command\UpdateCartItemQuantity;
 use App\Modules\Cart\Application\Query\ShowCart;
 use App\Modules\Cart\Presentation\Http\Request\AddCartItemRequest;
 use App\Support\CouponCalculator;
+use App\Support\StoreSettings;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -22,7 +25,9 @@ final class CartController extends Controller
     public function index(Request $request, ShowCart $query): Response
     {
         return Inertia::render('carrinho', [
-            'cart' => $query->handle($request->session()->get('cart_token'), $request->session()->get('coupon_code')),
+            'cart' => $query->handle($request->session()->get('cart_token'), $request->session()->get('coupon_code'), $request->session()->get('shipping_quote')),
+            'shippingQuotes' => $request->session()->get('shipping_quotes', []),
+            'shippingZip' => $request->session()->get('shipping_zip'),
         ]);
     }
 
@@ -56,6 +61,40 @@ final class CartController extends Controller
         }
 
         return to_route('carrinho')->with('success', 'Produto removido do carrinho.');
+    }
+
+    public function updateQuantity(Request $request, string $product, UpdateCartItemQuantity $command): RedirectResponse
+    {
+        $products = app(StoreSettings::class)->products();
+        $minimum = max(1, (int) ($products['minQuantity'] ?? 1));
+        $maximum = max($minimum, (int) ($products['maxQuantity'] ?? 100));
+        $data = $request->validate(['quantity' => ['required', 'integer', 'min:0', "max:{$maximum}"]]);
+        if ((int) $data['quantity'] > 0 && (int) $data['quantity'] < $minimum) {
+            return back()->withErrors(['quantity' => "A quantidade minima e {$minimum}."]);
+        }
+        $token = $request->session()->get('cart_token');
+
+        if (is_string($token)) {
+            try {
+                $command->handle($token, $product, (int) $data['quantity']);
+            } catch (RuntimeException $exception) {
+                return back()->withErrors(['cart' => $exception->getMessage()]);
+            }
+        }
+
+        return back()->with('success', 'Carrinho atualizado.');
+    }
+
+    public function updateNotes(Request $request, string $product, UpdateCartItemNotes $command): RedirectResponse
+    {
+        $data = $request->validate(['notes' => ['nullable', 'string', 'max:500']]);
+        $token = $request->session()->get('cart_token');
+
+        if (is_string($token)) {
+            $command->handle($token, $product, $data['notes'] ?? null);
+        }
+
+        return back()->with('success', 'Observacao salva.');
     }
 
     public function applyCoupon(Request $request, ShowCart $cart, CouponCalculator $coupons): RedirectResponse

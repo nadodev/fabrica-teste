@@ -18,6 +18,7 @@ final readonly class CartItem
         public ?string $imageUrl = null,
         public ?string $variationKey = null,
         public ?string $variationLabel = null,
+        public ?string $notes = null,
     ) {}
 
     public function subtotal(): Money

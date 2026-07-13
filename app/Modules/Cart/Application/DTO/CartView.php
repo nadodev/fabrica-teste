@@ -9,25 +9,36 @@ use App\Modules\Cart\Domain\CartItem;
 
 final readonly class CartView
 {
-    /** @param list<array<string, int|string|null>> $items */
+    /**
+     * @param  list<array<string, int|string|null>>  $items
+     * @param  array<string, mixed>|null  $coupon
+     * @param  array<string, mixed>|null  $shipping
+     */
     public function __construct(
         public array $items,
         public int $subtotalAmount,
         public int $discountAmount,
+        public int $shippingAmount,
         public int $totalAmount,
         public string $currency,
         public ?array $coupon = null,
+        public ?array $shipping = null,
     ) {}
 
     public static function empty(): self
     {
-        return new self([], 0, 0, 0, 'BRL');
+        return new self([], 0, 0, 0, 0, 'BRL');
     }
 
-    public static function fromDomain(Cart $cart, ?array $coupon = null): self
+    /**
+     * @param  array<string, mixed>|null  $coupon
+     * @param  array<string, mixed>|null  $shipping
+     */
+    public static function fromDomain(Cart $cart, ?array $coupon = null, ?array $shipping = null): self
     {
         $subtotal = $cart->total()->amount;
         $discount = min($subtotal, (int) ($coupon['discountAmount'] ?? 0));
+        $shippingAmount = max(0, (int) ($shipping['priceAmount'] ?? 0));
 
         return new self(
             array_map(fn (CartItem $item): array => [
@@ -42,15 +53,24 @@ final readonly class CartView
                 'imageUrl' => $item->imageUrl,
                 'variationKey' => $item->variationKey,
                 'variationLabel' => $item->variationLabel,
+                'notes' => $item->notes,
             ], $cart->items()),
             $subtotal,
             $discount,
-            max(0, $subtotal - $discount),
+            $shippingAmount,
+            max(0, $subtotal - $discount) + $shippingAmount,
             $cart->currency,
             $coupon === null ? null : [
                 'code' => $coupon['code'],
                 'description' => $coupon['description'] ?? '',
                 'discountAmount' => $discount,
+            ],
+            $shipping === null ? null : [
+                'serviceId' => (string) ($shipping['serviceId'] ?? ''),
+                'name' => (string) ($shipping['name'] ?? 'Frete'),
+                'companyName' => (string) ($shipping['companyName'] ?? ''),
+                'priceAmount' => $shippingAmount,
+                'deliveryTime' => (int) ($shipping['deliveryTime'] ?? 0),
             ],
         );
     }

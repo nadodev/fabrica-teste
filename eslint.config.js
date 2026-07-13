@@ -117,6 +117,7 @@ export default [
             'resources/js/components/ui/*',
             'resources/js/routes/**',
             'resources/js/wayfinder/**',
+            'fardamentos-loja/**',
         ],
     },
     prettier, // Turn off all rules that might conflict with Prettier

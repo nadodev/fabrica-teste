@@ -5,13 +5,16 @@ declare(strict_types=1);
 namespace App\Modules\Ordering\Presentation\Http;
 
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use App\Modules\Cart\Application\Query\ShowCart;
 use App\Modules\Ordering\Application\Command\CheckoutCart;
+use App\Modules\Ordering\Application\DTO\CheckoutData;
 use App\Modules\Ordering\Presentation\Http\Request\CheckoutRequest;
+use App\Support\StoreSettings;
 use DomainException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -21,17 +24,38 @@ final class CheckoutController extends Controller
 {
     public function create(Request $request, ShowCart $cart): Response|RedirectResponse
     {
-        $view = $cart->handle($request->session()->get('cart_token'), $request->session()->get('coupon_code'));
+        $settings = app(StoreSettings::class);
+        $customers = $settings->customers();
+        if ($request->user() === null && ((bool) ($customers['registrationRequired'] ?? false) || ! (bool) ($customers['guestCheckout'] ?? true))) {
+            return to_route('cliente.login')->withErrors(['auth' => 'Entre na sua conta para finalizar o pedido.']);
+        }
+
+        $view = $cart->handle($request->session()->get('cart_token'), $request->session()->get('coupon_code'), $request->session()->get('shipping_quote'));
 
         if ($view->items === []) {
             return to_route('carrinho')->withErrors(['cart' => 'Seu carrinho esta vazio.']);
         }
 
-        return Inertia::render('checkout', ['cart' => $view]);
+        if ($view->totalAmount < $settings->minimumOrderAmount()) {
+            return to_route('carrinho')->withErrors(['cart' => 'O valor minimo do pedido ainda nao foi atingido.']);
+        }
+
+        return Inertia::render('checkout', [
+            'cart' => $view,
+            'shippingZip' => $request->session()->get('shipping_zip'),
+            'paymentMethods' => $settings->enabledPaymentMethods(),
+            'customerSettings' => $customers,
+            'policySettings' => $settings->policies(),
+        ]);
     }
 
     public function store(CheckoutRequest $request, CheckoutCart $checkout): RedirectResponse
     {
+        $settings = app(StoreSettings::class);
+        $customers = $settings->customers();
+        if ($request->user() === null && ((bool) ($customers['registrationRequired'] ?? false) || ! (bool) ($customers['guestCheckout'] ?? true))) {
+            return to_route('cliente.login')->withErrors(['auth' => 'Entre na sua conta para finalizar o pedido.']);
+        }
         $token = $request->session()->get('cart_token');
 
         if (! is_string($token)) {
@@ -39,12 +63,37 @@ final class CheckoutController extends Controller
         }
 
         try {
-            $order = $checkout->handle((string) Str::uuid(), $token);
-            $view = app(ShowCart::class)->handle($token, $request->session()->get('coupon_code'));
-            $this->storeCustomerData($order->id, $request->validated(), $view);
-            $this->decrementVariationStock($order->cartId);
+            $data = $request->validated();
+            $user = Auth::user();
+            $customerName = $user instanceof User ? $user->name : (string) $data['customerName'];
+            $customerEmail = $user instanceof User ? $user->email : (string) $data['customerEmail'];
+            $couponCode = $request->session()->get('coupon_code');
+            $shippingQuote = $request->session()->get('shipping_quote');
+            $order = $checkout->handle(
+                (string) Str::uuid(),
+                $token,
+                new CheckoutData(
+                    (string) $data['checkoutType'],
+                    $customerName,
+                    $customerEmail,
+                    (string) $data['customerPhone'],
+                    isset($data['customerDocument']) ? (string) $data['customerDocument'] : null,
+                    (string) $data['shippingZip'],
+                    (string) $data['shippingAddress'],
+                    (string) $data['shippingNumber'],
+                    (string) $data['shippingCity'],
+                    (string) $data['shippingState'],
+                    (string) $data['deliveryMethod'],
+                    (string) $data['paymentMethod'],
+                    isset($data['notes']) ? (string) $data['notes'] : null,
+                    is_string($couponCode) ? $couponCode : null,
+                    is_array($shippingQuote) ? $shippingQuote : null,
+                    $user instanceof User ? (int) $user->getAuthIdentifier() : null,
+                ),
+            );
             $request->session()->forget('cart_token');
             $request->session()->forget('coupon_code');
+            $request->session()->forget(['shipping_quote', 'shipping_quotes', 'shipping_zip']);
         } catch (DomainException|RuntimeException $exception) {
             return back()->withErrors(['checkout' => $exception->getMessage()]);
         }
@@ -55,63 +104,5 @@ final class CheckoutController extends Controller
     public function success(string $order): Response
     {
         return Inertia::render('pedido-confirmado', ['orderNumber' => $order]);
-    }
-
-    /** @param array<string, mixed> $data */
-    private function storeCustomerData(string $orderId, array $data, object $cart): void
-    {
-        DB::table('ordering_orders')->where('id', $orderId)->update([
-            'customer_name' => $data['customerName'],
-            'customer_email' => $data['customerEmail'],
-            'customer_phone' => $data['customerPhone'],
-            'customer_document' => $data['customerDocument'] ?? null,
-            'shipping_zip' => $data['shippingZip'],
-            'shipping_address' => $data['shippingAddress'],
-            'shipping_number' => $data['shippingNumber'],
-            'shipping_city' => $data['shippingCity'],
-            'shipping_state' => $data['shippingState'],
-            'notes' => $data['notes'] ?? null,
-            'subtotal_amount' => $cart->subtotalAmount,
-            'discount_amount' => $cart->discountAmount,
-            'coupon_code' => $cart->coupon['code'] ?? null,
-            'total_amount' => $cart->totalAmount,
-            'updated_at' => now(),
-        ]);
-    }
-
-    private function decrementVariationStock(string $cartId): void
-    {
-        $items = DB::table('cart_items')->where('cart_id', $cartId)->whereNotNull('variation_key')->get();
-
-        foreach ($items as $item) {
-            $product = DB::table('catalog_products')->where('id', $item->product_id)->first(['variations']);
-            $variations = json_decode((string) ($product->variations ?? '[]'), true);
-
-            if (! is_array($variations)) {
-                continue;
-            }
-
-            $changed = false;
-            foreach ($variations as &$variation) {
-                if (($variation['id'] ?? null) !== $item->variation_key) {
-                    continue;
-                }
-
-                $variation['stock'] = max(0, (int) ($variation['stock'] ?? 0) - (int) $item->quantity);
-                $threshold = max(0, (int) ($variation['lowStockThreshold'] ?? 5));
-                $variation['lowStock'] = $variation['stock'] <= $threshold;
-                $variation['purchasable'] = $variation['stock'] > $threshold;
-                $changed = true;
-                break;
-            }
-            unset($variation);
-
-            if ($changed) {
-                DB::table('catalog_products')->where('id', $item->product_id)->update([
-                    'variations' => json_encode(array_values($variations), JSON_THROW_ON_ERROR),
-                    'updated_at' => now(),
-                ]);
-            }
-        }
     }
 }

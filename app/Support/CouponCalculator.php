@@ -12,6 +12,10 @@ final class CouponCalculator
     /** @return array{code: string, description: string, discountType: string, discountValue: int, discountAmount: int} */
     public function validDiscount(string $code, int $subtotalAmount): array
     {
+        if (! app(StoreSettings::class)->couponsEnabled()) {
+            throw new RuntimeException('Cupons estao desativados nesta loja.');
+        }
+
         $normalized = $this->normalize($code);
 
         if ($normalized === '') {
@@ -31,6 +35,14 @@ final class CouponCalculator
 
         if ($coupon->ends_at !== null && $now->gt($coupon->ends_at)) {
             throw new RuntimeException('Cupom expirado.');
+        }
+
+        if ((int) ($coupon->minimum_amount ?? 0) > $subtotalAmount) {
+            throw new RuntimeException('Cupom exige um valor minimo maior para este carrinho.');
+        }
+
+        if ($coupon->usage_limit !== null && (int) $coupon->used_count >= (int) $coupon->usage_limit) {
+            throw new RuntimeException('Cupom atingiu o limite de uso.');
         }
 
         $discountValue = max(0, (int) $coupon->discount_value);

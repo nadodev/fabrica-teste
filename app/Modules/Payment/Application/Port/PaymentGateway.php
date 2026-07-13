@@ -11,5 +11,5 @@ interface PaymentGateway
 {
     public function charge(PaymentRequest $request): PaymentResult;
 
-    public function refund(string $transactionId, ?int $amount = null): PaymentResult;
+    public function refund(string $transactionId, string $idempotencyKey, ?int $amount = null): PaymentResult;
 }

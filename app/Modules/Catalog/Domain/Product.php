@@ -11,9 +11,15 @@ use InvalidArgumentException;
 
 final class Product
 {
+    /** @var list<string> */
+    private array $galleryImages;
+
+    /** @var list<array{id: string, name: string, value: string, sku: string}> */
+    private array $variations;
+
     /**
-     * @param list<string> $galleryImages
-     * @param list<array{id?: string, name: string, value: string, stock: int, lowStockThreshold: int}> $variations
+     * @param  list<string>  $galleryImages
+     * @param  list<array{id?: string, name: string, value: string, sku?: string}>  $variations
      */
     public function __construct(
         public readonly ProductId $id,
@@ -24,10 +30,9 @@ final class Product
         private ProductStatus $status,
         private ?string $imageUrl = null,
         private string $category = 'Uniformes',
-        private array $galleryImages = [],
-        private array $variations = [],
-    )
-    {
+        array $galleryImages = [],
+        array $variations = [],
+    ) {
         $this->rename($name);
         $this->category = $this->sanitizeCategory($category);
         $this->galleryImages = $this->sanitizeGallery($galleryImages);
@@ -45,8 +50,8 @@ final class Product
     }
 
     /**
-     * @param list<string> $galleryImages
-     * @param list<array{id?: string, name: string, value: string, stock: int, lowStockThreshold: int}> $variations
+     * @param  list<string>  $galleryImages
+     * @param  list<array{id?: string, name: string, value: string, sku?: string}>  $variations
      */
     public function updateDetails(string $name, string $description, Money $price, ProductStatus $status, ?string $imageUrl, string $category = 'Uniformes', array $galleryImages = [], array $variations = []): void
     {
@@ -110,7 +115,7 @@ final class Product
         return $this->galleryImages;
     }
 
-    /** @return list<array{id: string, name: string, value: string, stock: int, lowStockThreshold: int, purchasable: bool, lowStock: bool}> */
+    /** @return list<array{id: string, name: string, value: string, sku: string}> */
     public function variations(): array
     {
         return $this->variations;
@@ -124,32 +129,16 @@ final class Product
 
         $variation = $this->findVariation($variationId);
 
-        if (! $variation['purchasable']) {
-            throw new InvalidArgumentException('Variation is not available for purchase.');
-        }
-
         return "{$variation['name']}: {$variation['value']}";
     }
 
-    public function variationStock(?string $variationId): ?int
+    public function variationSku(?string $variationId): string
     {
         if ($this->variations === []) {
-            return null;
+            return $this->sku->value;
         }
 
-        return $this->findVariation($variationId)['stock'];
-    }
-
-    public function availableForDisplay(int $productStock = 0): int
-    {
-        if ($this->variations === []) {
-            return $productStock;
-        }
-
-        return array_sum(array_map(
-            fn (array $variation): int => $variation['purchasable'] ? $variation['stock'] : 0,
-            $this->variations,
-        ));
+        return $this->findVariation($variationId)['sku'];
     }
 
     private function sanitizeCategory(string $category): string
@@ -159,7 +148,10 @@ final class Product
         return $category === '' ? 'Uniformes' : mb_substr($category, 0, 80);
     }
 
-    /** @param list<string> $galleryImages @return list<string> */
+    /**
+     * @param  list<string>  $galleryImages
+     * @return list<string>
+     */
     private function sanitizeGallery(array $galleryImages): array
     {
         return array_values(array_filter(array_map(
@@ -169,31 +161,25 @@ final class Product
     }
 
     /**
-     * @param list<array{id?: string, name: string, value: string, stock: int, lowStockThreshold: int}> $variations
-     * @return list<array{id: string, name: string, value: string, stock: int, lowStockThreshold: int, purchasable: bool, lowStock: bool}>
+     * @param  list<array{id?: string, name: string, value: string, sku?: string}>  $variations
+     * @return list<array{id: string, name: string, value: string, sku: string}>
      */
     private function sanitizeVariations(array $variations): array
     {
         $clean = [];
 
         foreach ($variations as $variation) {
-            $name = mb_substr(trim((string) ($variation['name'] ?? '')), 0, 40);
-            $value = mb_substr(trim((string) ($variation['value'] ?? '')), 0, 60);
-            $stock = max(0, (int) ($variation['stock'] ?? 0));
-            $lowStockThreshold = max(0, (int) ($variation['lowStockThreshold'] ?? 5));
+            $name = mb_substr(trim($variation['name']), 0, 40);
+            $value = mb_substr(trim($variation['value']), 0, 60);
 
             if ($name !== '' && $value !== '') {
                 $id = trim((string) ($variation['id'] ?? ''));
                 $id = $id === '' ? substr(hash('sha256', $name.':'.$value), 0, 16) : mb_substr($id, 0, 40);
-                $lowStock = $stock <= $lowStockThreshold;
                 $clean[] = [
                     'id' => $id,
                     'name' => $name,
                     'value' => $value,
-                    'stock' => $stock,
-                    'lowStockThreshold' => $lowStockThreshold,
-                    'purchasable' => $stock > $lowStockThreshold,
-                    'lowStock' => $lowStock,
+                    'sku' => mb_substr(trim((string) ($variation['sku'] ?? '')), 0, 64),
                 ];
             }
         }
@@ -201,7 +187,7 @@ final class Product
         return $clean;
     }
 
-    /** @return array{id: string, name: string, value: string, stock: int, lowStockThreshold: int, purchasable: bool, lowStock: bool} */
+    /** @return array{id: string, name: string, value: string, sku: string} */
     private function findVariation(?string $variationId): array
     {
         $variationId = trim((string) $variationId);

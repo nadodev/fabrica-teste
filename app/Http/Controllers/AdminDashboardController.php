@@ -16,6 +16,9 @@ final class AdminDashboardController extends Controller
         $products = DB::table('catalog_products');
         $totalRevenue = (int) $orders->sum('total_amount');
         $orderCount = (int) DB::table('ordering_orders')->count();
+        $todayRevenue = (int) DB::table('ordering_orders')->whereDate('created_at', today())->sum('total_amount');
+        $pendingOrders = (int) DB::table('ordering_orders')->whereIn('status', ['awaiting_payment', 'quote_requested'])->count();
+        $quoteCount = (int) DB::table('ordering_orders')->where('checkout_type', 'quote')->count();
         $activeProducts = (int) DB::table('catalog_products')->where('status', 'active')->count();
         $cartCount = (int) DB::table('cart_carts')->where('status', 'active')->count();
         $lowStock = $this->lowStockProducts();
@@ -31,6 +34,7 @@ final class AdminDashboardController extends Controller
                 'totalAmount' => (int) $order->total_amount,
                 'currency' => (string) $order->currency,
                 'status' => (string) $order->status,
+                'checkoutType' => (string) ($order->checkout_type ?? 'payment'),
                 'createdAt' => (string) $order->created_at,
             ])
             ->all();
@@ -53,6 +57,9 @@ final class AdminDashboardController extends Controller
             'stats' => [
                 'totalRevenue' => $totalRevenue,
                 'orderCount' => $orderCount,
+                'todayRevenue' => $todayRevenue,
+                'pendingOrders' => $pendingOrders,
+                'quoteCount' => $quoteCount,
                 'activeProducts' => $activeProducts,
                 'cartCount' => $cartCount,
                 'averageTicket' => $orderCount > 0 ? intdiv($totalRevenue, $orderCount) : 0,
@@ -67,33 +74,37 @@ final class AdminDashboardController extends Controller
     /** @return list<array{name: string, sku: string, variation: string, stock: int, threshold: int}> */
     private function lowStockProducts(): array
     {
-        return DB::table('catalog_products')->whereNotNull('variations')->get(['name', 'sku', 'variations'])
-            ->flatMap(function (object $product): array {
-                $variations = json_decode((string) $product->variations, true);
-
-                if (! is_array($variations)) {
-                    return [];
-                }
-
-                return array_values(array_filter(array_map(function (array $variation) use ($product): ?array {
-                    $stock = (int) ($variation['stock'] ?? 0);
-                    $threshold = (int) ($variation['lowStockThreshold'] ?? 5);
-
-                    if ($stock > $threshold) {
-                        return null;
-                    }
-
-                    return [
-                        'name' => (string) $product->name,
-                        'sku' => (string) $product->sku,
-                        'variation' => trim(($variation['name'] ?? '').': '.($variation['value'] ?? '')),
-                        'stock' => $stock,
-                        'threshold' => $threshold,
-                    ];
-                }, $variations)));
-            })
+        $levels = DB::table('inventory_stock_levels')
+            ->join('catalog_products', 'catalog_products.id', '=', 'inventory_stock_levels.product_id')
+            ->whereRaw('(inventory_stock_levels.on_hand - inventory_stock_levels.reserved) <= inventory_stock_levels.low_stock_threshold')
+            ->get(['catalog_products.name', 'catalog_products.variations', 'inventory_stock_levels.sku', 'inventory_stock_levels.variation_key', 'inventory_stock_levels.on_hand', 'inventory_stock_levels.reserved', 'inventory_stock_levels.low_stock_threshold'])
+            ->map(fn (object $level): array => [
+                'name' => (string) $level->name,
+                'sku' => (string) $level->sku,
+                'variation' => $this->variationLabel($level->variations, $level->variation_key),
+                'stock' => max(0, (int) $level->on_hand - (int) $level->reserved),
+                'threshold' => (int) $level->low_stock_threshold,
+            ])
             ->take(8)
             ->values()
             ->all();
+
+        return array_values($levels);
+    }
+
+    private function variationLabel(mixed $encoded, mixed $variationKey): string
+    {
+        if ($variationKey === null) {
+            return 'Produto simples';
+        }
+
+        $variations = json_decode((string) $encoded, true);
+        foreach (is_array($variations) ? $variations : [] as $variation) {
+            if (is_array($variation) && ($variation['id'] ?? null) === $variationKey) {
+                return trim((string) ($variation['name'] ?? '').': '.(string) ($variation['value'] ?? ''));
+            }
+        }
+
+        return (string) $variationKey;
     }
 }

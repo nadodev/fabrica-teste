@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace App\Modules\Inventory\Infrastructure;
 
+use App\Modules\Inventory\Application\Port\InventoryReadModel;
 use App\Modules\Inventory\Application\Port\StockGateway;
 use App\Modules\Inventory\Application\Port\StockManager;
+use App\Modules\Inventory\Application\Port\StockReservationLifecycle;
+use App\Modules\Inventory\Infrastructure\Persistence\DatabaseInventoryReadModel;
 use App\Modules\Inventory\Infrastructure\Persistence\DatabaseStockGateway;
 use Illuminate\Support\ServiceProvider;
 
@@ -15,5 +18,7 @@ final class InventoryServiceProvider extends ServiceProvider
     public array $bindings = [
         StockGateway::class => DatabaseStockGateway::class,
         StockManager::class => DatabaseStockGateway::class,
+        StockReservationLifecycle::class => DatabaseStockGateway::class,
+        InventoryReadModel::class => DatabaseInventoryReadModel::class,
     ];
 }

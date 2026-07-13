@@ -63,8 +63,43 @@ final class EloquentProductRepository implements ProductRepository
             ProductStatus::from((string) $record->getAttribute('status')),
             $record->getAttribute('image_url'),
             (string) ($record->getAttribute('category') ?? 'Uniformes'),
-            (array) ($record->getAttribute('gallery_images') ?? []),
-            (array) ($record->getAttribute('variations') ?? []),
+            $this->galleryImages($record->getAttribute('gallery_images')),
+            $this->variations($record->getAttribute('variations')),
         );
+    }
+
+    /** @return list<string> */
+    private function galleryImages(mixed $value): array
+    {
+        if (! is_array($value)) {
+            return [];
+        }
+
+        return array_values(array_filter($value, is_string(...)));
+    }
+
+    /** @return list<array{id?: string, name: string, value: string, sku?: string}> */
+    private function variations(mixed $value): array
+    {
+        if (! is_array($value)) {
+            return [];
+        }
+
+        $variations = [];
+        foreach ($value as $variation) {
+            if (! is_array($variation) || ! is_string($variation['name'] ?? null) || ! is_string($variation['value'] ?? null)) {
+                continue;
+            }
+            $clean = ['name' => $variation['name'], 'value' => $variation['value']];
+            if (is_string($variation['id'] ?? null)) {
+                $clean['id'] = $variation['id'];
+            }
+            if (is_string($variation['sku'] ?? null)) {
+                $clean['sku'] = $variation['sku'];
+            }
+            $variations[] = $clean;
+        }
+
+        return $variations;
     }
 }

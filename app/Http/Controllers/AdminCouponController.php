@@ -82,12 +82,16 @@ final class AdminCouponController extends Controller
             'description' => ['nullable', 'string', 'max:255'],
             'discount_type' => ['required', Rule::in(['percent', 'fixed'])],
             'discount_value' => ['required', 'integer', 'min:1', 'max:10000000'],
+            'minimum_amount' => ['nullable', 'integer', 'min:0', 'max:10000000'],
+            'usage_limit' => ['nullable', 'integer', 'min:1', 'max:1000000'],
             'starts_at' => ['nullable', 'date'],
             'ends_at' => ['nullable', 'date', 'after_or_equal:starts_at'],
             'is_active' => ['sometimes', 'boolean'],
         ]);
 
         $data['description'] = $data['description'] ?? '';
+        $data['minimum_amount'] = (int) ($data['minimum_amount'] ?? 0);
+        $data['usage_limit'] = $data['usage_limit'] === null ? null : (int) $data['usage_limit'];
         $data['is_active'] = $request->boolean('is_active');
 
         return $data;

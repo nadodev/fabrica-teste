@@ -13,7 +13,8 @@ final readonly class ShowCart
 {
     public function __construct(private CartRepository $carts, private CouponCalculator $coupons) {}
 
-    public function handle(?string $plainToken, ?string $couponCode = null): CartView
+    /** @param array<string, mixed>|null $shipping */
+    public function handle(?string $plainToken, ?string $couponCode = null, ?array $shipping = null): CartView
     {
         if ($plainToken === null) {
             return CartView::empty();
@@ -34,6 +35,6 @@ final readonly class ShowCart
             }
         }
 
-        return CartView::fromDomain($cart, $coupon);
+        return CartView::fromDomain($cart, $coupon, $shipping);
     }
 }

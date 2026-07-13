@@ -12,7 +12,10 @@ use App\Modules\Catalog\Application\Query\FindProduct;
 use App\Modules\Catalog\Application\Query\ListAllProducts;
 use App\Modules\Catalog\Presentation\Http\Request\StoreProductRequest;
 use App\Modules\Catalog\Presentation\Http\Request\UpdateProductRequest;
+use App\Modules\Inventory\Application\Port\StockManager;
+use App\Support\StoreSettings;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -20,6 +23,7 @@ use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 use RuntimeException;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use Throwable;
 
 final class AdminProductController extends Controller
@@ -31,7 +35,94 @@ final class AdminProductController extends Controller
 
     public function create(): Response
     {
-        return Inertia::render('admin/products/create');
+        return Inertia::render('admin/products/create', ['categories' => $this->categories()]);
+    }
+
+    public function export(): StreamedResponse
+    {
+        abort_unless((bool) (app(StoreSettings::class)->system()['productImportExport'] ?? true), 404);
+
+        return response()->streamDownload(function (): void {
+            $handle = fopen('php://output', 'w');
+            if ($handle === false) {
+                throw new RuntimeException('Export stream could not be opened.');
+            }
+            fputcsv($handle, ['sku', 'name', 'description', 'category', 'price', 'stock', 'status']);
+
+            $stockTotals = DB::table('inventory_stock_levels')
+                ->select('product_id')
+                ->selectRaw('SUM(on_hand) AS on_hand')
+                ->groupBy('product_id');
+
+            DB::table('catalog_products')
+                ->leftJoinSub($stockTotals, 'inventory_totals', 'inventory_totals.product_id', '=', 'catalog_products.id')
+                ->orderBy('catalog_products.name')
+                ->select('catalog_products.*', 'inventory_totals.on_hand')
+                ->get()
+                ->each(function (object $product) use ($handle): void {
+                    fputcsv($handle, [
+                        $product->sku,
+                        $product->name,
+                        $product->description,
+                        $product->category,
+                        number_format(((int) $product->price_amount) / 100, 2, '.', ''),
+                        (int) ($product->on_hand ?? 0),
+                        $product->status,
+                    ]);
+                });
+
+            fclose($handle);
+        }, 'produtos.csv', ['Content-Type' => 'text/csv']);
+    }
+
+    public function import(Request $request, StockManager $stock): RedirectResponse
+    {
+        abort_unless((bool) (app(StoreSettings::class)->system()['productImportExport'] ?? true), 404);
+
+        $data = $request->validate([
+            'file' => ['required', 'file', 'mimes:csv,txt', 'max:4096'],
+        ]);
+
+        $file = $data['file'];
+        if (! $file instanceof UploadedFile) {
+            return back()->withErrors(['file' => 'Arquivo invalido.']);
+        }
+
+        $rows = array_map('str_getcsv', file($file->getRealPath()) ?: []);
+        $header = array_map(fn (?string $value): string => trim((string) $value), array_shift($rows) ?? []);
+        $created = 0;
+
+        DB::transaction(function () use ($rows, $header, &$created, $stock): void {
+            foreach ($rows as $row) {
+                if (count($header) !== count($row)) {
+                    continue;
+                }
+                $data = array_combine($header, $row);
+                if (trim((string) ($data['sku'] ?? '')) === '' || trim((string) ($data['name'] ?? '')) === '') {
+                    continue;
+                }
+
+                $id = (string) (DB::table('catalog_products')->where('sku', $data['sku'])->value('id') ?? Str::uuid());
+                $price = (int) round(((float) str_replace(',', '.', (string) ($data['price'] ?? '0'))) * 100);
+
+                DB::table('catalog_products')->updateOrInsert(['id' => $id], [
+                    'sku' => mb_substr((string) $data['sku'], 0, 64),
+                    'name' => mb_substr((string) $data['name'], 0, 160),
+                    'description' => (string) ($data['description'] ?? ''),
+                    'category' => mb_substr((string) ($data['category'] ?? 'Uniformes'), 0, 80),
+                    'price_amount' => max(0, $price),
+                    'price_currency' => 'BRL',
+                    'status' => in_array($data['status'] ?? 'draft', ['draft', 'active'], true) ? $data['status'] : 'draft',
+                    'updated_at' => now(),
+                    'created_at' => now(),
+                ]);
+
+                $stock->synchronizeProduct('catalog-import-'.hash('sha256', (string) $data['sku']), $id, (string) $data['sku'], max(0, (int) ($data['stock'] ?? 0)), []);
+                $created++;
+            }
+        });
+
+        return back()->with('success', "{$created} produto(s) importado(s).");
     }
 
     public function store(StoreProductRequest $request, CreateProduct $command): RedirectResponse
@@ -54,8 +145,8 @@ final class AdminProductController extends Controller
                 (string) ($data['category'] ?? 'Uniformes'),
                 $this->galleryWithMainImage($imageUrl, $gallery),
                 $variations,
+                (int) ($data['stock'] ?? 100),
             );
-            $this->syncStock($productId, $this->stockQuantity((int) ($data['stock'] ?? 100), $variations));
         } catch (Throwable $exception) {
             if ($storedPath !== null) {
                 Storage::disk('public')->delete($storedPath);
@@ -73,7 +164,7 @@ final class AdminProductController extends Controller
         $result = $query->handle($product);
         abort_if($result === null, 404);
 
-        return Inertia::render('admin/products/edit', ['product' => $result]);
+        return Inertia::render('admin/products/edit', ['product' => $result, 'categories' => $this->categories()]);
     }
 
     public function update(string $product, UpdateProductRequest $request, FindProduct $query, UpdateProduct $command): RedirectResponse
@@ -97,8 +188,8 @@ final class AdminProductController extends Controller
                 (string) ($data['category'] ?? 'Uniformes'),
                 $this->galleryWithMainImage($imageUrl, $gallery),
                 $variations,
+                (int) ($data['stock'] ?? $current->stockAvailable),
             );
-            $this->syncStock($product, $this->stockQuantity((int) ($data['stock'] ?? $current->stockAvailable), $variations));
         } catch (Throwable $exception) {
             if ($storedPath !== null) {
                 Storage::disk('public')->delete($storedPath);
@@ -162,7 +253,10 @@ final class AdminProductController extends Controller
         }
     }
 
-    /** @param array<int, UploadedFile>|UploadedFile|null $files @return array{list<string>, list<string>} */
+    /**
+     * @param  array<int, mixed>|UploadedFile|null  $files
+     * @return array{list<string>, list<string>}
+     */
     private function storeGalleryImages(array|UploadedFile|null $files): array
     {
         $files = $files instanceof UploadedFile ? [$files] : ($files ?? []);
@@ -187,7 +281,10 @@ final class AdminProductController extends Controller
         return [$urls, $paths];
     }
 
-    /** @param list<string> $gallery */
+    /**
+     * @param  list<string>  $gallery
+     * @return list<string>
+     */
     private function galleryWithMainImage(?string $imageUrl, array $gallery): array
     {
         return array_values(array_unique(array_filter([
@@ -196,7 +293,10 @@ final class AdminProductController extends Controller
         ], fn (?string $url): bool => is_string($url) && $url !== '')));
     }
 
-    /** @param list<string> $previous @param list<string> $next */
+    /**
+     * @param  list<string>  $previous
+     * @param  list<string>  $next
+     */
     private function deleteRemovedGalleryImages(array $previous, array $next): void
     {
         foreach (array_diff($previous, $next) as $url) {
@@ -204,38 +304,15 @@ final class AdminProductController extends Controller
         }
     }
 
-    private function syncStock(string $productId, int $quantity): void
+    /** @return list<string> */
+    private function categories(): array
     {
-        $exists = DB::table('inventory_stock')->where('product_id', $productId)->exists();
-
-        if ($exists) {
-            DB::table('inventory_stock')->where('product_id', $productId)->update([
-                'on_hand' => $quantity,
-                'reserved' => 0,
-                'version' => DB::raw('version + 1'),
-                'updated_at' => now(),
-            ]);
-
-            return;
-        }
-
-        DB::table('inventory_stock')->insert([
-                'product_id' => $productId,
-                'on_hand' => $quantity,
-                'reserved' => 0,
-                'version' => 1,
-                'created_at' => now(),
-                'updated_at' => now(),
-        ]);
-    }
-
-    /** @param list<array{id?: string, name: string, value: string, stock: int, lowStockThreshold: int}> $variations */
-    private function stockQuantity(int $fallback, array $variations): int
-    {
-        if ($variations === []) {
-            return $fallback;
-        }
-
-        return array_sum(array_map(fn (array $variation): int => max(0, (int) $variation['stock']), $variations));
+        return array_values(DB::table('catalog_categories')
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->pluck('name')
+            ->map(fn (mixed $name): string => (string) $name)
+            ->all());
     }
 }

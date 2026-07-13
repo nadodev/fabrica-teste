@@ -10,8 +10,8 @@ final readonly class ReceiveStock
 {
     public function __construct(private StockManager $stock) {}
 
-    public function handle(string $reference, string $productId, int $quantity): void
+    public function handle(string $reference, string $productId, int $quantity, ?string $variationKey = null): void
     {
-        $this->stock->receive($reference, $productId, $quantity);
+        $this->stock->receive($reference, $productId, $quantity, $variationKey);
     }
 }

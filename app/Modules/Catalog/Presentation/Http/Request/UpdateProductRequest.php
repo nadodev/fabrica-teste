@@ -28,6 +28,7 @@ final class UpdateProductRequest extends FormRequest
             'variations.*.id' => ['nullable', 'string', 'max:40'],
             'variations.*.name' => ['nullable', 'string', 'max:40'],
             'variations.*.value' => ['nullable', 'string', 'max:60'],
+            'variations.*.sku' => ['nullable', 'string', 'max:64', 'distinct'],
             'variations.*.stock' => ['nullable', 'integer', 'min:0', 'max:1000000'],
             'variations.*.lowStockThreshold' => ['nullable', 'integer', 'min:0', 'max:1000000'],
             'image' => ['nullable', 'file', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096', 'dimensions:max_width=4000,max_height=4000'],
@@ -52,7 +53,7 @@ final class UpdateProductRequest extends FormRequest
         ), fn (string $url): bool => $url !== ''));
     }
 
-    /** @return list<array{id?: string, name: string, value: string, stock: int, lowStockThreshold: int}> */
+    /** @return list<array{id?: string, name: string, value: string, sku?: string, stock: int, lowStockThreshold: int}> */
     public function variations(): array
     {
         $variations = [];
@@ -66,6 +67,7 @@ final class UpdateProductRequest extends FormRequest
                     'id' => (string) ($variation['id'] ?? ''),
                     'name' => $name,
                     'value' => $value,
+                    'sku' => trim((string) ($variation['sku'] ?? '')),
                     'stock' => (int) ($variation['stock'] ?? 0),
                     'lowStockThreshold' => (int) ($variation['lowStockThreshold'] ?? 5),
                 ];

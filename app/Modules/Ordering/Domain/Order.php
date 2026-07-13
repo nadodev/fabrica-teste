@@ -16,22 +16,26 @@ final class Order
         public readonly string $cartId,
         private array $items,
         private OrderStatus $status,
+        private OrderDetails $details,
+        public readonly ?int $customerUserId = null,
     ) {}
 
     /** @param list<OrderItem> $items */
-    public static function place(string $id, string $number, string $cartId, array $items): self
+    public static function place(string $id, string $number, string $cartId, array $items, OrderDetails $details, ?int $customerUserId = null): self
     {
         if ($items === []) {
             throw new DomainException('Cannot place an order without items.');
         }
 
-        return new self($id, $number, $cartId, $items, OrderStatus::AwaitingPayment);
+        $status = $details->checkoutType === 'quote' ? OrderStatus::QuoteRequested : OrderStatus::AwaitingPayment;
+
+        return new self($id, $number, $cartId, $items, $status, $details, $customerUserId);
     }
 
     /** @param non-empty-list<OrderItem> $items */
-    public static function restore(string $id, string $number, string $cartId, array $items, OrderStatus $status): self
+    public static function restore(string $id, string $number, string $cartId, array $items, OrderStatus $status, OrderDetails $details, ?int $customerUserId = null): self
     {
-        return new self($id, $number, $cartId, $items, $status);
+        return new self($id, $number, $cartId, $items, $status, $details, $customerUserId);
     }
 
     /** @return non-empty-list<OrderItem> */
@@ -45,15 +49,33 @@ final class Order
         return $this->status;
     }
 
-    public function total(): Money
+    public function details(): OrderDetails
     {
-        $total = new Money(0, $this->items[0]->unitPrice->currency);
+        return $this->details;
+    }
+
+    public function subtotal(): Money
+    {
+        $subtotal = new Money(0, $this->items[0]->unitPrice->currency);
 
         foreach ($this->items as $item) {
-            $total = $total->add($item->subtotal());
+            $subtotal = $subtotal->add($item->subtotal());
         }
 
-        return $total;
+        return $subtotal;
+    }
+
+    public function total(): Money
+    {
+        $subtotal = $this->subtotal();
+        if ($this->details->discount->amount > $subtotal->amount) {
+            throw new DomainException('Order discount cannot exceed subtotal.');
+        }
+
+        return new Money(
+            $subtotal->amount - $this->details->discount->amount + $this->details->shipping->amount,
+            $subtotal->currency,
+        );
     }
 
     public function markPaid(): void
@@ -63,5 +85,31 @@ final class Order
         }
 
         $this->status = OrderStatus::Paid;
+        $this->details = $this->details->withPaymentStatus('paid');
+    }
+
+    public function cancelAfterPaymentFailure(): void
+    {
+        if ($this->status !== OrderStatus::AwaitingPayment) {
+            throw new DomainException('Only an awaiting payment order can be cancelled after payment failure.');
+        }
+
+        $this->status = OrderStatus::Cancelled;
+        $this->details = $this->details->withPaymentStatus('refused');
+    }
+
+    public function markRefunded(): void
+    {
+        if ($this->status !== OrderStatus::Paid) {
+            throw new DomainException('Only a paid order can be refunded.');
+        }
+
+        $this->status = OrderStatus::Refunded;
+        $this->details = $this->details->withPaymentStatus('refunded');
+    }
+
+    public function recordPaymentStatus(string $status): void
+    {
+        $this->details = $this->details->withPaymentStatus($status);
     }
 }

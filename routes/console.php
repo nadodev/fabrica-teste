@@ -1,8 +1,49 @@
 <?php
 
+use App\Modules\Inventory\Application\Command\ExpireStockReservations;
+use App\Modules\Ordering\Application\Command\ProcessOrderOutbox;
+use App\Modules\Payment\Application\Command\ProcessAsaasWebhooks;
+use App\Modules\Payment\Application\Command\ProcessPaymentOutbox;
+use App\Modules\Payment\Application\Command\ReconcileAsaasPayments;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Schedule;
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
+
+Artisan::command('outbox:process-orders {--limit=50}', function (ProcessOrderOutbox $processor): void {
+    $processed = $processor->handle((int) $this->option('limit'));
+    $this->info("{$processed} notificacao(oes) de pedido processada(s).");
+})->purpose('Process pending order notifications from the transactional outbox');
+
+Schedule::command('outbox:process-orders --limit=50')->everyMinute()->withoutOverlapping();
+
+Artisan::command('inventory:expire-reservations {--limit=100}', function (ExpireStockReservations $expirer): void {
+    $expired = $expirer->handle((int) $this->option('limit'));
+    $this->info("{$expired} reserva(s) de estoque expirada(s).");
+})->purpose('Expire due stock reservations and release their reserved balance');
+
+Schedule::command('inventory:expire-reservations --limit=100')->everyMinute()->withoutOverlapping();
+
+Artisan::command('payments:process {--limit=50}', function (ProcessPaymentOutbox $processor): void {
+    $processed = $processor->handle((int) $this->option('limit'));
+    $this->info("{$processed} pagamento(s) processado(s).");
+})->purpose('Process payment intents from the transactional outbox');
+
+Schedule::command('payments:process --limit=50')->everyMinute()->withoutOverlapping();
+
+Artisan::command('payments:process-asaas-webhooks {--limit=100}', function (ProcessAsaasWebhooks $processor): void {
+    $processed = $processor->handle((int) $this->option('limit'));
+    $this->info("{$processed} evento(s) do Asaas processado(s).");
+})->purpose('Process authenticated Asaas payment webhook events');
+
+Schedule::command('payments:process-asaas-webhooks --limit=100')->everyMinute()->withoutOverlapping();
+
+Artisan::command('payments:reconcile-asaas {--limit=100}', function (ReconcileAsaasPayments $reconciler): void {
+    $processed = $reconciler->handle((int) $this->option('limit'));
+    $this->info("{$processed} pagamento(s) do Asaas reconciliado(s).");
+})->purpose('Reconcile local payments with the current Asaas payment state');
+
+Schedule::command('payments:reconcile-asaas --limit=100')->everyFifteenMinutes()->withoutOverlapping();

@@ -11,31 +11,33 @@ use App\Modules\Cart\Domain\Port\CartRepository;
 use App\Modules\Catalog\Domain\Port\ProductRepository;
 use App\Modules\Catalog\Domain\ValueObject\ProductId;
 use App\Modules\Inventory\Application\Port\StockGateway;
+use App\Support\StoreSettings;
 use RuntimeException;
 
 final readonly class AddItemToCart
 {
-    public function __construct(private CartRepository $carts, private ProductRepository $products, private StockGateway $stock) {}
+    public function __construct(private CartRepository $carts, private ProductRepository $products, private StockGateway $stock, private StoreSettings $settings) {}
 
     public function handle(string $cartId, string $plainToken, string $productId, int $quantity, ?string $variationId = null): CartView
     {
         $product = $this->products->find(ProductId::fromString($productId))
             ?? throw new RuntimeException('Product not found.');
         $tokenHash = hash('sha256', $plainToken);
+        $allowOutOfStock = $this->settings->allowsOutOfStockSales();
         $variationLabel = $product->variationLabel($variationId);
         $variationKey = $variationLabel === null ? null : (string) $variationId;
-        $variationStock = $product->variationStock($variationId);
+        $sku = $product->variationSku($variationKey);
 
         for ($attempt = 1; $attempt <= 3; $attempt++) {
             $cart = $this->carts->findByTokenHash($tokenHash) ?? new Cart($cartId, $tokenHash, $product->price()->currency);
             $requestedTotal = $cart->quantityFor($product->id->value, $variationKey) + $quantity;
-            $available = $variationStock ?? $this->stock->available($product->id->value);
+            $available = $this->stock->available($product->id->value, $variationKey);
 
-            if (($variationStock !== null || $this->stock->tracked($product->id->value)) && $available < $requestedTotal) {
+            if (! $allowOutOfStock && $this->settings->controlsStock() && $this->stock->tracked($product->id->value, $variationKey) && $available < $requestedTotal) {
                 throw new RuntimeException("Estoque insuficiente. Disponivel: {$available}.");
             }
 
-            $cart->add($product->id->value, $product->name(), $product->price(), $quantity, $product->sku->value, $product->imageUrl(), $variationKey, $variationLabel);
+            $cart->add($product->id->value, $product->name(), $product->price(), $quantity, $sku, $product->imageUrl(), $variationKey, $variationLabel);
 
             try {
                 $this->carts->save($cart);
