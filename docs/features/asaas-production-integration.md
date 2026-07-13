@@ -25,10 +25,13 @@ Primeira cobranca real, ainda bloqueada por `ASAAS_LIVE_ENABLED=false`.
 - Chargeback permanece visivel no pagamento e no snapshot do pedido.
 - Checkout PIX cria a cobranca imediatamente, consulta `/payments/{id}/pixQrCode` e apresenta as instrucoes somente a sessao compradora ou ao dono autenticado.
 - Falha antes de receber o ID do provedor devolve o pagamento para `pending`, permitindo retry seguro.
+- Cartao exige nome impresso, numero, validade e codigo de seguranca validos, alem dos dados do titular e IP real do comprador.
+- Numero completo e codigo de seguranca existem apenas durante a requisicao: nao entram no pedido, sessao, banco, outbox ou logs.
+- Recusa HTTP 400 do cartao encerra o pagamento como recusado, cancela o pedido e libera a reserva sem inventar um ID de cobranca Asaas.
 
 ## Fluxo principal
 
-No checkout pago, a cobranca e criada imediatamente para apresentar as instrucoes ao cliente. O outbox permanece como fallback, consulta por `externalReference` antes de criar e nao duplica uma cobranca ja vinculada. O endpoint `/webhooks/asaas` autentica, reduz e grava o evento; o scheduler aplica a transicao. A cada 15 minutos, pagamentos abertos sao consultados no Asaas e transformados nos mesmos eventos internos para recuperar webhooks perdidos.
+No checkout pago, a cobranca e criada imediatamente. PIX retorna QR Code e copia e cola. Cartao abre os campos somente quando selecionado e envia os dados transitorios diretamente ao Asaas junto com titular e IP. O outbox permanece como fallback, consulta por `externalReference` antes de criar e nao duplica uma cobranca ja vinculada. O endpoint `/webhooks/asaas` autentica, reduz e grava o evento; o scheduler aplica a transicao. A cada 15 minutos, pagamentos abertos sao consultados no Asaas e transformados nos mesmos eventos internos para recuperar webhooks perdidos.
 
 ## Fluxos alternativos
 
@@ -36,7 +39,7 @@ Timeout permanece retryable. Eventos informativos sao auditados sem alterar pedi
 
 ## Casos de uso
 
-`ProcessPayment`, `ReceiveAsaasWebhook`, `ProcessAsaasWebhooks` e `ReconcileAsaasPayments`.
+`ProcessPayment`, `ReceiveAsaasWebhook`, `ProcessAsaasWebhooks` e `ReconcileAsaasPayments`. `ProcessPayment` recebe `CreditCardData` somente na chamada sincrona do checkout.
 
 ## Arquitetura
 
@@ -60,7 +63,7 @@ Referencia externa do pedido, ID do evento, fingerprint da reconciliacao e trans
 
 ## Seguranca
 
-Chave e token ficam no ambiente. Webhook usa `asaas-access-token`, comparacao constante, limite de requisicoes e exclusao CSRF apenas na rota dedicada.
+Chave e token ficam no ambiente. Webhook usa `asaas-access-token`, comparacao constante, limite de requisicoes e exclusao CSRF apenas na rota dedicada. HTTPS e obrigatorio para cartao. Numero e CVV sao excluidos do flash de validacao, os parametros sao marcados como sensiveis e recusas nao encadeiam excecoes HTTP que poderiam carregar contexto sensivel.
 
 ## Eventos
 
@@ -68,7 +71,7 @@ Somente eventos de cobrancas selecionados no Asaas sao aceitos e novos campos de
 
 ## Interface
 
-A URL publica configurada e `https://fabricafardamento.gejalabs.com.br/webhooks/asaas`. A pagina de confirmacao exibe QR Code, copia e cola, vencimento e atualiza o estado automaticamente.
+A URL publica configurada e `https://fabricafardamento.gejalabs.com.br/webhooks/asaas`. A pagina de confirmacao exibe QR Code, copia e cola, vencimento e atualiza o estado automaticamente. Ao escolher cartao, o checkout mostra nome impresso, numero, mes, ano e codigo de seguranca com feedback de validacao e processamento.
 
 ## Testes automatizados
 

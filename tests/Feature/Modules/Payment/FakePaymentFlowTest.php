@@ -12,7 +12,10 @@ use App\Modules\Payment\Application\Command\ProcessPaymentOutbox;
 use App\Modules\Payment\Application\Command\ReconcileAsaasPayments;
 use App\Modules\Payment\Application\Command\RecoverStuckPayment;
 use App\Modules\Payment\Application\Command\RefundPayment;
+use App\Modules\Payment\Application\DTO\CreditCardData;
+use App\Modules\Payment\Application\Exception\PaymentCardDeclined;
 use App\Modules\Payment\Application\Exception\PaymentGatewayTimeout;
+use App\Modules\Payment\Application\Port\PaymentGateway;
 use App\Modules\Shared\Domain\ValueObject\Money;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -22,7 +25,7 @@ beforeEach(function () {
     config()->set('payment.gateway', 'fake');
 });
 
-function checkoutForFakePayment(int $stock = 3, int $quantity = 2): array
+function checkoutForFakePayment(int $stock = 3, int $quantity = 2, string $method = 'pix'): array
 {
     $productId = (string) Str::uuid();
     ProductRecord::query()->create([
@@ -41,7 +44,7 @@ function checkoutForFakePayment(int $stock = 3, int $quantity = 2): array
     app(CartRepository::class)->save($cart);
     $order = app(CheckoutCart::class)->handle((string) Str::uuid(), $token, new CheckoutData(
         'payment', 'Cliente Pagamento', 'pagamento@example.com', '11999999999', null,
-        '01001000', 'Rua Teste', '10', 'Sao Paulo', 'SP', 'pickup', 'pix', null, null, null,
+        '01001000', 'Rua Teste', '10', 'Sao Paulo', 'SP', 'pickup', $method, null, null, null,
     ));
 
     return [$order, $productId];
@@ -73,6 +76,25 @@ it('declines payment definitively and releases the reservation', function () {
     $this->assertDatabaseHas('ordering_orders', ['id' => $order->id, 'status' => 'cancelled', 'payment_status' => 'refused']);
     $this->assertDatabaseHas('inventory_stock_levels', ['product_id' => $productId, 'on_hand' => 3, 'reserved' => 0]);
     $this->assertDatabaseHas('inventory_reservations', ['product_id' => $productId, 'status' => 'released']);
+});
+
+it('cancels a card order when Asaas refuses it without creating a provider charge', function () {
+    [$order, $productId] = checkoutForFakePayment(method: 'credit_card');
+    $gateway = Mockery::mock(PaymentGateway::class);
+    $gateway->shouldReceive('charge')->once()->andThrow(new PaymentCardDeclined('Cartao recusado.'));
+    app()->instance(PaymentGateway::class, $gateway);
+
+    expect(fn () => app(ProcessPayment::class)->handle($order->id, new CreditCardData(
+        'CLIENTE PAGAMENTO', '5162306219378829', '05', '2030', '318', '203.0.113.30',
+    )))->toThrow(PaymentCardDeclined::class);
+
+    $this->assertDatabaseHas('payment_payments', [
+        'order_id' => $order->id,
+        'status' => 'declined',
+        'provider_payment_id' => null,
+    ]);
+    $this->assertDatabaseHas('ordering_orders', ['id' => $order->id, 'status' => 'cancelled', 'payment_status' => 'refused']);
+    $this->assertDatabaseHas('inventory_stock_levels', ['product_id' => $productId, 'on_hand' => 3, 'reserved' => 0]);
 });
 
 it('keeps timeout retryable without duplicating the provider charge', function () {

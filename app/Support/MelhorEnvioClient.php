@@ -12,6 +12,8 @@ use RuntimeException;
 
 final class MelhorEnvioClient
 {
+    public function __construct(private readonly ShippingToken $tokens) {}
+
     /** @return list<array<string, int|string>> */
     public function quote(string $destinationZip, CartView $cart): array
     {
@@ -21,7 +23,7 @@ final class MelhorEnvioClient
             throw new RuntimeException('Configure e ative o Melhor Envio no painel administrativo.');
         }
 
-        $token = trim((string) ($settings->token ?? ''));
+        $token = $this->tokens->decode($settings->token ?? null);
         $originZip = $this->onlyDigits((string) ($settings->origin_zip ?? ''));
 
         if ($token === '' || $originZip === '') {
@@ -29,13 +31,13 @@ final class MelhorEnvioClient
         }
 
         $endpoint = ((string) $settings->environment === 'production')
-            ? 'https://www.melhorenvio.com.br/api/v2/me/shipment/calculate'
+            ? 'https://melhorenvio.com.br/api/v2/me/shipment/calculate'
             : 'https://sandbox.melhorenvio.com.br/api/v2/me/shipment/calculate';
 
         $response = Http::withToken($token)
             ->acceptJson()
             ->asJson()
-            ->withHeaders(['User-Agent' => config('app.name', 'Uniform Crafted')])
+            ->withHeaders(['User-Agent' => $this->userAgent()])
             ->timeout(20)
             ->post($endpoint, [
                 'from' => ['postal_code' => $originZip],
@@ -122,10 +124,18 @@ final class MelhorEnvioClient
         return preg_replace('/\D+/', '', $value) ?? '';
     }
 
+    private function userAgent(): string
+    {
+        $name = trim((string) config('app.name', 'Uniform Crafted')) ?: 'Uniform Crafted';
+        $email = trim((string) config('mail.from.address', ''));
+
+        return $email === '' ? $name : $name.' ('.$email.')';
+    }
+
     private function errorMessage(mixed $body, int $status): string
     {
         if ($status === 401 || $status === 403) {
-            return 'Melhor Envio recusou o token. Confira se o token pertence ao ambiente selecionado: sandbox ou producao.';
+            return 'Melhor Envio recusou o token. Gere um novo token no ambiente selecionado e salve novamente no painel de frete.';
         }
 
         $message = data_get($body, 'message') ?? data_get($body, 'error') ?? data_get($body, 'errors.0');

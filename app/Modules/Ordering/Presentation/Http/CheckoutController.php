@@ -12,6 +12,7 @@ use App\Modules\Ordering\Application\DTO\CheckoutData;
 use App\Modules\Ordering\Presentation\Http\Request\CheckoutRequest;
 use App\Modules\Payment\Application\Command\ProcessPayment;
 use App\Modules\Payment\Application\DTO\CreditCardData;
+use App\Modules\Payment\Application\Exception\PaymentCardDeclined;
 use App\Modules\Payment\Application\Query\ShowCheckoutSuccess;
 use App\Support\StoreSettings;
 use DomainException;
@@ -118,7 +119,7 @@ final class CheckoutController extends Controller
                     : null;
                 $payments->handle($order->id, $card);
             } catch (Throwable $exception) {
-                if ($order->details()->paymentMethod !== 'credit_card') {
+                if (! $exception instanceof PaymentCardDeclined) {
                     report($exception);
                 }
                 $paymentError = $order->details()->paymentMethod === 'credit_card'

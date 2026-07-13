@@ -2,6 +2,7 @@
 
 use App\Modules\Payment\Application\DTO\CreditCardData;
 use App\Modules\Payment\Application\DTO\PaymentRequest;
+use App\Modules\Payment\Application\Exception\PaymentCardDeclined;
 use App\Modules\Payment\Infrastructure\Gateway\AsaasPaymentGateway;
 use Illuminate\Support\Facades\Http;
 
@@ -96,6 +97,23 @@ it('sends transient credit card data and the customer IP to Asaas', function () 
         && $request['creditCardHolderInfo']['postalCode'] === '01001000'
         && $request['remoteIp'] === '203.0.113.10');
 });
+
+it('returns a safe card-declined exception for an Asaas refusal', function () {
+    Http::fake([
+        'https://api.asaas.com/v3/payments?*' => Http::response(['data' => []]),
+        'https://api.asaas.com/v3/customers' => Http::response(['id' => 'cus_card_refused']),
+        'https://api.asaas.com/v3/payments' => Http::response(['errors' => [['description' => 'refused']]], 400),
+    ]);
+
+    app(AsaasPaymentGateway::class)->charge(new PaymentRequest(
+        'order-card-refused', 1000, 'BRL', 'credit_card', 'idem-card-refused',
+        [
+            'name' => 'Cliente', 'email' => 'cliente@example.com', 'document' => '12345678909',
+            'phone' => '11999999999', 'postalCode' => '01001000', 'addressNumber' => '10',
+        ],
+        creditCard: new CreditCardData('CLIENTE', '5162306219378829', '05', '2030', '318', '203.0.113.10'),
+    ));
+})->throws(PaymentCardDeclined::class, 'O cartao nao foi autorizado pelo provedor de pagamento.');
 
 it('reads the provider state and counts only completed refunds', function () {
     Http::fake([

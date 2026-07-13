@@ -7,6 +7,7 @@ namespace App\Modules\Payment\Infrastructure\Gateway;
 use App\Modules\Payment\Application\DTO\PaymentRequest;
 use App\Modules\Payment\Application\DTO\PaymentResult;
 use App\Modules\Payment\Application\DTO\ProviderPaymentSnapshot;
+use App\Modules\Payment\Application\Exception\PaymentCardDeclined;
 use App\Modules\Payment\Application\Exception\PaymentGatewayTimeout;
 use App\Modules\Payment\Application\Port\PaymentGateway;
 use App\Modules\Payment\Application\Port\PaymentReconciliationGateway;
@@ -71,10 +72,12 @@ final readonly class AsaasPaymentGateway implements PaymentGateway, PaymentRecon
                 previous: $request->methodToken === 'credit_card' ? null : $exception,
             );
         } catch (RequestException $exception) {
+            if ($request->methodToken === 'credit_card' && $exception->response->status() === 400) {
+                throw new PaymentCardDeclined('O cartao nao foi autorizado pelo provedor de pagamento.');
+            }
+
             throw new RuntimeException(
-                $request->methodToken === 'credit_card'
-                    ? 'O cartao nao foi autorizado pelo provedor de pagamento.'
-                    : 'O Asaas recusou a criacao da cobranca.',
+                'O Asaas recusou a criacao da cobranca.',
                 previous: $request->methodToken === 'credit_card' ? null : $exception,
             );
         }

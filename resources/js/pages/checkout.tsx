@@ -100,6 +100,7 @@ export default function Checkout({
 
     const setPaymentMethod = (method: string) => {
         form.setData('paymentMethod', method);
+
         if (method !== 'credit_card') {
             form.setData((current) => ({
                 ...current,
@@ -451,7 +452,9 @@ export default function Checkout({
                                                 autoComplete="cc-exp-month"
                                                 maxLength={2}
                                                 placeholder="MM"
-                                                value={form.data.cardExpiryMonth}
+                                                value={
+                                                    form.data.cardExpiryMonth
+                                                }
                                                 onChange={(event) =>
                                                     form.setData(
                                                         'cardExpiryMonth',

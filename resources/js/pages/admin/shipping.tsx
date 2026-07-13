@@ -10,7 +10,6 @@ type ShippingSettings = {
     originZip: string;
     hasToken: boolean;
     tokenPreview: string | null;
-    token: string;
     options?: Record<string, string | boolean | number | null>;
 };
 
@@ -23,7 +22,7 @@ export default function AdminShipping({
         isEnabled: shipping.isEnabled,
         environment: shipping.environment,
         originZip: shipping.originZip ?? '',
-        token: shipping.token ?? '',
+        token: '',
         options: {
             postingAddress: String(shipping.options?.postingAddress ?? ''),
             productionExtraDays: String(

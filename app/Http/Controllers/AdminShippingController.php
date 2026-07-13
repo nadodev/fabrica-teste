@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Support\ShippingToken;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -13,6 +14,8 @@ use Inertia\Response;
 
 final class AdminShippingController extends Controller
 {
+    public function __construct(private readonly ShippingToken $tokens) {}
+
     public function edit(): Response
     {
         $settings = DB::table('shipping_settings')->where('id', 1)->first();
@@ -22,9 +25,9 @@ final class AdminShippingController extends Controller
                 'isEnabled' => (bool) ($settings->is_enabled ?? false),
                 'environment' => (string) ($settings->environment ?? 'sandbox'),
                 'originZip' => (string) ($settings->origin_zip ?? ''),
-                'hasToken' => is_string($settings->token ?? null) && trim((string) $settings->token) !== '',
-                'tokenPreview' => $this->tokenPreview($settings->token ?? null),
-                'token' => (string) ($settings->token ?? ''),
+                'hasToken' => $this->tokens->decode($settings->token ?? null) !== '',
+                'tokenPreview' => $this->tokens->preview($settings->token ?? null),
+                'token' => '',
                 'options' => $this->options($settings->options ?? null),
             ],
         ]);
@@ -50,22 +53,13 @@ final class AdminShippingController extends Controller
                 'environment' => (string) $data['environment'],
                 'origin_zip' => preg_replace('/\D+/', '', (string) ($data['originZip'] ?? '')),
                 'options' => json_encode($data['options'] ?? [], JSON_THROW_ON_ERROR),
-                'token' => $token === '' ? $currentToken : $token,
+                'token' => $token === '' ? $currentToken : $this->tokens->encode($token),
                 'updated_at' => now(),
                 'created_at' => now(),
             ],
         );
 
         return back()->with('success', 'Configuracao de frete salva.');
-    }
-
-    private function tokenPreview(mixed $token): ?string
-    {
-        if (! is_string($token) || trim($token) === '') {
-            return null;
-        }
-
-        return 'salvo, termina em '.substr(trim($token), -6);
     }
 
     /** @return array<string, mixed> */

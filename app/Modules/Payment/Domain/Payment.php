@@ -86,6 +86,18 @@ final class Payment
         $this->version++;
     }
 
+    public function declineWithoutProvider(): void
+    {
+        if ($this->status !== PaymentStatus::Processing) {
+            throw new DomainException('Only a processing payment can be declined.');
+        }
+
+        $this->status = PaymentStatus::Declined;
+        $this->providerPaymentId = null;
+        $this->failureCode = 'declined';
+        $this->version++;
+    }
+
     public function retryAfterTimeout(): void
     {
         $this->retryAfterFailure('timeout');

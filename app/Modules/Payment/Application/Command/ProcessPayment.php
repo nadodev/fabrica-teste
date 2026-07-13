@@ -10,6 +10,7 @@ use App\Modules\Ordering\Domain\Order;
 use App\Modules\Ordering\Domain\Port\OrderRepository;
 use App\Modules\Payment\Application\DTO\CreditCardData;
 use App\Modules\Payment\Application\DTO\PaymentRequest;
+use App\Modules\Payment\Application\Exception\PaymentCardDeclined;
 use App\Modules\Payment\Application\Exception\PaymentGatewayTimeout;
 use App\Modules\Payment\Application\Port\PaymentGateway;
 use App\Modules\Payment\Application\Port\PaymentInstructionStore;
@@ -57,6 +58,17 @@ final readonly class ProcessPayment
                 ],
                 creditCard: $creditCard,
             ));
+        } catch (PaymentCardDeclined $exception) {
+            $this->transactions->run(function () use ($payment, $order, $attemptId): void {
+                $this->transitionReservations($payment, $order, false);
+                $payment->declineWithoutProvider();
+                $order->cancelAfterPaymentFailure();
+                $this->payments->save($payment, 'card_declined');
+                $this->orders->save($order);
+                $this->payments->finishAttempt($attemptId, 'declined', null, 'declined');
+            });
+
+            throw $exception;
         } catch (PaymentGatewayTimeout $exception) {
             $this->transactions->run(function () use ($payment, $attemptId): void {
                 $payment->retryAfterTimeout();

@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
+use Illuminate\Support\ViewErrorBag;
 use Inertia\Testing\AssertableInertia as Assert;
 
 it('atomically snapshots a cart, reserves stock and creates one order', function () {
@@ -317,12 +318,16 @@ it('validates credit card fields without flashing the number or security code', 
         'cardExpiryYear' => (string) now()->subYear()->year,
         'cardCcv' => '12',
         'privacyAccepted' => true,
-    ]);
+    ], ['Idempotency-Key' => (string) Str::uuid()]);
 
-    $response->assertUnprocessable()
-        ->assertJsonValidationErrors(['cardNumber', 'cardExpiryMonth', 'cardExpiryYear', 'cardCcv'])
+    $response->assertRedirect(route('checkout'))
         ->assertSessionMissing('_old_input.cardNumber')
         ->assertSessionMissing('_old_input.cardCcv');
+    $sessionErrors = $response->getSession()->all()['errors'] ?? [];
+    $validationKeys = $sessionErrors instanceof ViewErrorBag
+        ? $sessionErrors->getBag('default')->keys()
+        : array_keys((array) ($sessionErrors['default']['messages'] ?? []));
+    expect($validationKeys)->toContain('cardNumber', 'cardExpiryMonth', 'cardExpiryYear', 'cardCcv');
 });
 
 it('processes a credit card immediately without persisting sensitive card data', function () {
