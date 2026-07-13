@@ -9,6 +9,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -38,13 +39,20 @@ final class AdminShippingController extends Controller
         $data = $request->validate([
             'isEnabled' => ['required', 'boolean'],
             'environment' => ['required', Rule::in(['sandbox', 'production'])],
-            'originZip' => ['nullable', 'string', 'max:20'],
+            'originZip' => ['nullable', 'string', 'regex:/^(?:\D*\d){8}\D*$/'],
             'token' => ['nullable', 'string', 'max:5000'],
             'options' => ['nullable', 'array'],
         ]);
 
-        $currentToken = DB::table('shipping_settings')->where('id', 1)->value('token');
+        $current = DB::table('shipping_settings')->where('id', 1)->first();
+        $currentToken = $current->token ?? null;
         $token = trim((string) ($data['token'] ?? ''));
+        if ((bool) $data['isEnabled'] && $token === '' && $this->tokens->decode($currentToken) === '') {
+            throw ValidationException::withMessages(['token' => 'Informe o token do Melhor Envio antes de ativar o frete.']);
+        }
+        if ($token === '' && $current !== null && (string) $current->environment !== (string) $data['environment']) {
+            throw ValidationException::withMessages(['token' => 'Informe um token do ambiente selecionado ao trocar entre sandbox e producao.']);
+        }
 
         DB::table('shipping_settings')->updateOrInsert(
             ['id' => 1],

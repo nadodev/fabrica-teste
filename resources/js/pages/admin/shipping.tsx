@@ -2,6 +2,7 @@ import { Head, useForm } from '@inertiajs/react';
 import { Save, Truck } from 'lucide-react';
 import type { FormEvent, ReactNode } from 'react';
 import { createIdempotencyKey } from '@/lib/idempotency-key';
+import { formatPostalCode } from '@/lib/input-masks';
 import { AdminLayout } from '@/modules/admin/ui/admin-layout';
 
 type ShippingSettings = {
@@ -21,7 +22,7 @@ export default function AdminShipping({
     const form = useForm({
         isEnabled: shipping.isEnabled,
         environment: shipping.environment,
-        originZip: shipping.originZip ?? '',
+        originZip: formatPostalCode(shipping.originZip ?? ''),
         token: '',
         options: {
             postingAddress: String(shipping.options?.postingAddress ?? ''),
@@ -115,11 +116,14 @@ export default function AdminShipping({
                         >
                             <input
                                 className="input"
+                                inputMode="numeric"
+                                autoComplete="postal-code"
+                                maxLength={9}
                                 value={form.data.originZip}
                                 onChange={(event) =>
                                     form.setData(
                                         'originZip',
-                                        event.target.value,
+                                        formatPostalCode(event.target.value),
                                     )
                                 }
                                 placeholder="54325440"

@@ -12,6 +12,7 @@ import {
 import type { FormEvent } from 'react';
 import fallbackImage from '@/assets/prod-polo.jpg';
 import { createIdempotencyKey } from '@/lib/idempotency-key';
+import { formatPostalCode } from '@/lib/input-masks';
 import { formatMoney } from '@/modules/catalog/domain/product';
 
 type CartItem = {
@@ -101,7 +102,9 @@ export default function CartPage({
     );
     const canCheckout = safeCart.totalAmount >= minimumOrderValue;
     const couponForm = useForm({ code: safeCart.coupon?.code ?? '' });
-    const shippingForm = useForm({ zip: shippingZip ?? '' });
+    const shippingForm = useForm({
+        zip: formatPostalCode(shippingZip ?? ''),
+    });
     const remove = (cartItemKey: string) => {
         router.delete(`/carrinho/itens/${encodeURIComponent(cartItemKey)}`, {
             headers: { 'Idempotency-Key': createIdempotencyKey() },
@@ -407,11 +410,16 @@ export default function CartPage({
                             </label>
                             <div className="mt-2 flex gap-2">
                                 <input
+                                    inputMode="numeric"
+                                    autoComplete="postal-code"
+                                    maxLength={9}
                                     value={shippingForm.data.zip}
                                     onChange={(event) =>
                                         shippingForm.setData(
                                             'zip',
-                                            event.target.value,
+                                            formatPostalCode(
+                                                event.target.value,
+                                            ),
                                         )
                                     }
                                     className="min-w-0 flex-1 rounded-md border border-border bg-white px-3 py-2 text-sm outline-none focus:border-navy"

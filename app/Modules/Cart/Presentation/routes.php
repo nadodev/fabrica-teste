@@ -3,10 +3,14 @@
 declare(strict_types=1);
 
 use App\Modules\Cart\Presentation\Http\CartController;
+use App\Modules\Cart\Presentation\Http\PostalAddressController;
 use App\Modules\Cart\Presentation\Http\ShippingController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/carrinho', [CartController::class, 'index'])->name('carrinho');
+Route::get('/endereco/cep', PostalAddressController::class)
+    ->middleware('throttle:30,1')
+    ->name('endereco.cep');
 Route::post('/carrinho/itens', [CartController::class, 'store'])
     ->middleware(['throttle:commerce', 'idempotent'])
     ->name('carrinho.itens.store');

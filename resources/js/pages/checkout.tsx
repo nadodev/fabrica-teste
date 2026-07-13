@@ -1,7 +1,13 @@
 import { Link, useForm } from '@inertiajs/react';
 import { ArrowLeft, CheckCircle2, ShieldCheck } from 'lucide-react';
+import { useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { createIdempotencyKey } from '@/lib/idempotency-key';
+import {
+    formatDocument,
+    formatPhone,
+    formatPostalCode,
+} from '@/lib/input-masks';
 import { formatMoney } from '@/modules/catalog/domain/product';
 
 type CartItem = {
@@ -55,6 +61,12 @@ type CustomerSettings = {
     privacyRequired?: boolean;
 };
 type PolicySettings = { privacyUrl?: string; termsUrl?: string };
+type PostalAddressResponse = {
+    street: string;
+    city: string;
+    state: string;
+    message?: string;
+};
 
 export default function Checkout({
     cart = emptyCart,
@@ -79,7 +91,7 @@ export default function Checkout({
         customerEmail: '',
         customerPhone: '',
         customerDocument: '',
-        shippingZip: shippingZip ?? '',
+        shippingZip: formatPostalCode(shippingZip ?? ''),
         shippingAddress: '',
         shippingNumber: '',
         shippingCity: '',
@@ -97,6 +109,78 @@ export default function Checkout({
     });
 
     const checkoutError = (form.errors as Record<string, string>).checkout;
+    const [addressLookup, setAddressLookup] = useState<{
+        status: 'idle' | 'loading' | 'success' | 'error';
+        message: string;
+    }>({ status: 'idle', message: '' });
+    const lastLookupZip = useRef('');
+    const addressRequest = useRef(0);
+    const shippingNumberInput = useRef<HTMLInputElement>(null);
+
+    const lookupAddress = async (value: string, retry = false) => {
+        const zip = value.replace(/\D/g, '');
+
+        if (zip.length !== 8) {
+            lastLookupZip.current = '';
+            setAddressLookup({ status: 'idle', message: '' });
+
+            return;
+        }
+
+        if (!retry && lastLookupZip.current === zip) {
+            return;
+        }
+
+        lastLookupZip.current = zip;
+        const requestId = ++addressRequest.current;
+        setAddressLookup({
+            status: 'loading',
+            message: 'Buscando endereco...',
+        });
+
+        try {
+            const response = await fetch(
+                `/endereco/cep?zip=${encodeURIComponent(zip)}`,
+                { headers: { Accept: 'application/json' } },
+            );
+            const data = (await response.json()) as PostalAddressResponse;
+
+            if (requestId !== addressRequest.current) {
+                return;
+            }
+
+            if (!response.ok) {
+                setAddressLookup({
+                    status: 'error',
+                    message:
+                        data.message || 'Nao foi possivel consultar o CEP.',
+                });
+
+                return;
+            }
+
+            form.setData((current) => ({
+                ...current,
+                shippingAddress: data.street || current.shippingAddress,
+                shippingCity: data.city || current.shippingCity,
+                shippingState: data.state || current.shippingState,
+            }));
+            setAddressLookup({
+                status: 'success',
+                message: 'Endereco preenchido pelo CEP.',
+            });
+            window.requestAnimationFrame(() =>
+                shippingNumberInput.current?.focus(),
+            );
+        } catch {
+            if (requestId === addressRequest.current) {
+                setAddressLookup({
+                    status: 'error',
+                    message: 'Nao foi possivel consultar o CEP agora.',
+                });
+            }
+        }
+    };
 
     const setPaymentMethod = (method: string) => {
         form.setData('paymentMethod', method);
@@ -181,11 +265,14 @@ export default function Checkout({
                         >
                             <input
                                 className="input"
+                                inputMode="tel"
+                                autoComplete="tel"
+                                maxLength={15}
                                 value={form.data.customerPhone}
                                 onChange={(e) =>
                                     form.setData(
                                         'customerPhone',
-                                        e.target.value,
+                                        formatPhone(e.target.value),
                                     )
                                 }
                             />
@@ -196,11 +283,13 @@ export default function Checkout({
                         >
                             <input
                                 className="input"
+                                inputMode="numeric"
+                                maxLength={18}
                                 value={form.data.customerDocument}
                                 onChange={(e) =>
                                     form.setData(
                                         'customerDocument',
-                                        e.target.value,
+                                        formatDocument(e.target.value),
                                     )
                                 }
                             />
@@ -244,11 +333,36 @@ export default function Checkout({
                         <Field label="CEP" error={form.errors.shippingZip}>
                             <input
                                 className="input"
+                                inputMode="numeric"
+                                autoComplete="postal-code"
+                                maxLength={9}
                                 value={form.data.shippingZip}
-                                onChange={(e) =>
-                                    form.setData('shippingZip', e.target.value)
+                                onChange={(e) => {
+                                    const value = formatPostalCode(
+                                        e.target.value,
+                                    );
+                                    form.setData('shippingZip', value);
+                                    void lookupAddress(value);
+                                }}
+                                onBlur={() =>
+                                    void lookupAddress(
+                                        form.data.shippingZip,
+                                        addressLookup.status === 'error',
+                                    )
                                 }
                             />
+                            {addressLookup.status !== 'idle' && (
+                                <span
+                                    className={`mt-1 block text-xs ${addressLookup.status === 'error' ? 'text-red-700' : 'text-text-muted'}`}
+                                    role={
+                                        addressLookup.status === 'error'
+                                            ? 'alert'
+                                            : 'status'
+                                    }
+                                >
+                                    {addressLookup.message}
+                                </span>
+                            )}
                         </Field>
                         <Field
                             label="Endereco"
@@ -270,6 +384,7 @@ export default function Checkout({
                             error={form.errors.shippingNumber}
                         >
                             <input
+                                ref={shippingNumberInput}
                                 className="input"
                                 value={form.data.shippingNumber}
                                 onChange={(e) =>
@@ -292,11 +407,15 @@ export default function Checkout({
                         <Field label="Estado" error={form.errors.shippingState}>
                             <input
                                 className="input"
+                                maxLength={2}
                                 value={form.data.shippingState}
                                 onChange={(e) =>
                                     form.setData(
                                         'shippingState',
-                                        e.target.value,
+                                        e.target.value
+                                            .replace(/[^a-z]/gi, '')
+                                            .slice(0, 2)
+                                            .toUpperCase(),
                                     )
                                 }
                             />

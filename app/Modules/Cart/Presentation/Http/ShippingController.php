@@ -16,7 +16,7 @@ final class ShippingController extends Controller
     public function quote(Request $request, ShowCart $cart, MelhorEnvioClient $melhorEnvio): RedirectResponse
     {
         $data = $request->validate([
-            'zip' => ['required', 'string', 'max:20'],
+            'zip' => ['required', 'string', 'regex:/^(?:\D*\d){8}\D*$/'],
         ]);
 
         $view = $cart->handle($request->session()->get('cart_token'), $request->session()->get('coupon_code'));
