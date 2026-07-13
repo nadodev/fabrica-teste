@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace App\Modules\Payment\Infrastructure;
 
 use App\Modules\Payment\Application\Port\PaymentGateway;
+use App\Modules\Payment\Application\Port\PaymentInstructionStore;
 use App\Modules\Payment\Application\Port\PaymentReconciliationGateway;
 use App\Modules\Payment\Application\Port\PaymentRepository;
 use App\Modules\Payment\Application\Port\PaymentWebhookInbox;
 use App\Modules\Payment\Infrastructure\Gateway\AsaasPaymentGateway;
 use App\Modules\Payment\Infrastructure\Gateway\FakePaymentGateway;
+use App\Modules\Payment\Infrastructure\Persistence\DatabasePaymentInstructionStore;
 use App\Modules\Payment\Infrastructure\Persistence\DatabasePaymentRepository;
 use App\Modules\Payment\Infrastructure\Persistence\DatabasePaymentWebhookInbox;
 use Illuminate\Support\ServiceProvider;
@@ -20,6 +22,7 @@ final class PaymentServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(PaymentRepository::class, DatabasePaymentRepository::class);
+        $this->app->bind(PaymentInstructionStore::class, DatabasePaymentInstructionStore::class);
         $this->app->bind(PaymentWebhookInbox::class, DatabasePaymentWebhookInbox::class);
         $this->app->bind(PaymentReconciliationGateway::class, AsaasPaymentGateway::class);
         $this->app->bind(PaymentGateway::class, function ($app): PaymentGateway {

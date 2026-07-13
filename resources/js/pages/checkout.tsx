@@ -87,11 +87,31 @@ export default function Checkout({
         checkoutType: 'quote',
         deliveryMethod: 'shipping',
         paymentMethod: paymentMethods[0] ?? 'combine',
+        cardHolderName: '',
+        cardNumber: '',
+        cardExpiryMonth: '',
+        cardExpiryYear: '',
+        cardCcv: '',
         notes: '',
         privacyAccepted: false,
     });
 
     const checkoutError = (form.errors as Record<string, string>).checkout;
+
+    const setPaymentMethod = (method: string) => {
+        form.setData('paymentMethod', method);
+        if (method !== 'credit_card') {
+            form.setData((current) => ({
+                ...current,
+                paymentMethod: method,
+                cardHolderName: '',
+                cardNumber: '',
+                cardExpiryMonth: '',
+                cardExpiryYear: '',
+                cardCcv: '',
+            }));
+        }
+    };
 
     const submit = (event: FormEvent) => {
         event.preventDefault();
@@ -114,8 +134,8 @@ export default function Checkout({
                         Finalizar compra
                     </h1>
                     <p className="mt-2 text-white/75">
-                        Preencha os dados para gerar o pedido. Pagamento sera
-                        combinado depois.
+                        Preencha os dados para gerar o pedido e concluir o
+                        pagamento com seguranca.
                     </p>
                 </div>
             </header>
@@ -305,7 +325,7 @@ export default function Checkout({
                                 checked={form.data.checkoutType === 'quote'}
                                 onChange={() => {
                                     form.setData('checkoutType', 'quote');
-                                    form.setData('paymentMethod', 'combine');
+                                    setPaymentMethod('combine');
                                 }}
                             />
                             Gerar orcamento
@@ -323,8 +343,7 @@ export default function Checkout({
                                 checked={form.data.checkoutType === 'payment'}
                                 onChange={() => {
                                     form.setData('checkoutType', 'payment');
-                                    form.setData(
-                                        'paymentMethod',
+                                    setPaymentMethod(
                                         paymentMethods[0] ?? 'combine',
                                     );
                                 }}
@@ -353,10 +372,7 @@ export default function Checkout({
                                         className="input"
                                         value={form.data.paymentMethod}
                                         onChange={(e) =>
-                                            form.setData(
-                                                'paymentMethod',
-                                                e.target.value,
-                                            )
+                                            setPaymentMethod(e.target.value)
                                         }
                                     >
                                         {paymentMethods.includes('pix') && (
@@ -377,6 +393,123 @@ export default function Checkout({
                                     </select>
                                 </Field>
                             </div>
+                            {form.data.paymentMethod === 'credit_card' && (
+                                <div className="mt-4 rounded-xl border border-border bg-bg-soft p-4">
+                                    <h3 className="font-display text-lg font-black text-navy">
+                                        Dados do cartao
+                                    </h3>
+                                    <p className="mt-1 text-xs text-text-muted">
+                                        Os dados sao enviados diretamente para
+                                        processar esta compra e nao ficam salvos
+                                        na loja.
+                                    </p>
+                                    <div className="grid gap-x-4 sm:grid-cols-2">
+                                        <Field
+                                            label="Nome impresso no cartao"
+                                            error={form.errors.cardHolderName}
+                                        >
+                                            <input
+                                                className="input"
+                                                autoComplete="cc-name"
+                                                value={form.data.cardHolderName}
+                                                onChange={(event) =>
+                                                    form.setData(
+                                                        'cardHolderName',
+                                                        event.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </Field>
+                                        <Field
+                                            label="Numero do cartao"
+                                            error={form.errors.cardNumber}
+                                        >
+                                            <input
+                                                className="input"
+                                                inputMode="numeric"
+                                                autoComplete="cc-number"
+                                                maxLength={19}
+                                                value={form.data.cardNumber}
+                                                onChange={(event) =>
+                                                    form.setData(
+                                                        'cardNumber',
+                                                        event.target.value.replace(
+                                                            /\D/g,
+                                                            '',
+                                                        ),
+                                                    )
+                                                }
+                                            />
+                                        </Field>
+                                        <Field
+                                            label="Mes de validade (MM)"
+                                            error={form.errors.cardExpiryMonth}
+                                        >
+                                            <input
+                                                className="input"
+                                                inputMode="numeric"
+                                                autoComplete="cc-exp-month"
+                                                maxLength={2}
+                                                placeholder="MM"
+                                                value={form.data.cardExpiryMonth}
+                                                onChange={(event) =>
+                                                    form.setData(
+                                                        'cardExpiryMonth',
+                                                        event.target.value.replace(
+                                                            /\D/g,
+                                                            '',
+                                                        ),
+                                                    )
+                                                }
+                                            />
+                                        </Field>
+                                        <Field
+                                            label="Ano de validade (AAAA)"
+                                            error={form.errors.cardExpiryYear}
+                                        >
+                                            <input
+                                                className="input"
+                                                inputMode="numeric"
+                                                autoComplete="cc-exp-year"
+                                                maxLength={4}
+                                                placeholder="AAAA"
+                                                value={form.data.cardExpiryYear}
+                                                onChange={(event) =>
+                                                    form.setData(
+                                                        'cardExpiryYear',
+                                                        event.target.value.replace(
+                                                            /\D/g,
+                                                            '',
+                                                        ),
+                                                    )
+                                                }
+                                            />
+                                        </Field>
+                                        <Field
+                                            label="Codigo de seguranca"
+                                            error={form.errors.cardCcv}
+                                        >
+                                            <input
+                                                type="password"
+                                                className="input"
+                                                inputMode="numeric"
+                                                autoComplete="cc-csc"
+                                                maxLength={4}
+                                                value={form.data.cardCcv}
+                                                onChange={(event) =>
+                                                    form.setData(
+                                                        'cardCcv',
+                                                        event.target.value.replace(
+                                                            /\D/g,
+                                                            '',
+                                                        ),
+                                                    )
+                                                }
+                                            />
+                                        </Field>
+                                    </div>
+                                </div>
+                            )}
                         </>
                     )}
 
@@ -535,8 +668,8 @@ export default function Checkout({
                         </strong>
                     </div>
                     <div className="mt-5 flex items-center gap-2 rounded-lg bg-bg-soft p-3 text-xs text-text-muted">
-                        <ShieldCheck className="h-4 w-4 text-navy" /> Pedido sem
-                        pagamento online nesta etapa.
+                        <ShieldCheck className="h-4 w-4 text-navy" /> Pagamento
+                        protegido e processado pelo Asaas.
                     </div>
                 </aside>
             </main>

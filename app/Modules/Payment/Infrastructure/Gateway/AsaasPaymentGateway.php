@@ -13,6 +13,7 @@ use App\Modules\Payment\Application\Port\PaymentReconciliationGateway;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 
@@ -20,34 +21,69 @@ final readonly class AsaasPaymentGateway implements PaymentGateway, PaymentRecon
 {
     public function __construct(private ConnectionInterface $database) {}
 
-    public function charge(PaymentRequest $request): PaymentResult
+    public function charge(#[\SensitiveParameter] PaymentRequest $request): PaymentResult
     {
         $this->ensureLiveEnabled();
 
         try {
             $existing = $this->client()->get('/payments', ['externalReference' => $request->orderId])->throw()->json('data.0');
             if (is_array($existing) && is_string($existing['id'] ?? null)) {
-                return $this->result($existing);
+                return $this->resultWithInstructions($existing, $request->methodToken);
             }
 
             $customerId = $this->customerId($request);
-            $response = $this->client()->post('/payments', [
+            $body = [
                 'customer' => $customerId,
                 'billingType' => $this->billingType($request->methodToken),
                 'value' => $request->amount / 100,
                 'dueDate' => now()->addDays(max(1, (int) config('payment.asaas.due_days', 3)))->toDateString(),
                 'description' => 'Pedido '.$request->orderId,
                 'externalReference' => $request->orderId,
-            ])->throw()->json();
+            ];
+            if ($request->methodToken === 'credit_card') {
+                if ($request->creditCard === null) {
+                    throw new RuntimeException('Os dados do cartao sao necessarios para processar o pagamento.');
+                }
+                $document = preg_replace('/\D/', '', (string) ($request->customer['document'] ?? '')) ?? '';
+                $phone = preg_replace('/\D/', '', (string) ($request->customer['phone'] ?? '')) ?? '';
+                $body['creditCard'] = [
+                    'holderName' => $request->creditCard->holderName,
+                    'number' => $request->creditCard->number,
+                    'expiryMonth' => $request->creditCard->expiryMonth,
+                    'expiryYear' => $request->creditCard->expiryYear,
+                    'ccv' => $request->creditCard->ccv,
+                ];
+                $body['creditCardHolderInfo'] = [
+                    'name' => (string) ($request->customer['name'] ?? ''),
+                    'email' => (string) ($request->customer['email'] ?? ''),
+                    'cpfCnpj' => $document,
+                    'postalCode' => preg_replace('/\D/', '', (string) ($request->customer['postalCode'] ?? '')),
+                    'addressNumber' => (string) ($request->customer['addressNumber'] ?? ''),
+                    'phone' => $phone,
+                    'mobilePhone' => $phone,
+                ];
+                $body['remoteIp'] = $request->creditCard->remoteIp;
+            }
+            $response = $this->client()->post('/payments', $body)->throw()->json();
         } catch (ConnectionException $exception) {
-            throw new PaymentGatewayTimeout('Asaas connection timed out.', previous: $exception);
+            throw new PaymentGatewayTimeout(
+                'Asaas connection timed out.',
+                previous: $request->methodToken === 'credit_card' ? null : $exception,
+            );
+        } catch (RequestException $exception) {
+            throw new RuntimeException(
+                $request->methodToken === 'credit_card'
+                    ? 'O cartao nao foi autorizado pelo provedor de pagamento.'
+                    : 'O Asaas recusou a criacao da cobranca.',
+                previous: $request->methodToken === 'credit_card' ? null : $exception,
+            );
         }
 
         if (! is_array($response)) {
             throw new RuntimeException('Asaas returned an invalid payment response.');
         }
 
-        return $this->result($response);
+        return $this->resultWithInstructions($response, $request->methodToken);
     }
 
     public function refund(string $transactionId, string $idempotencyKey, ?int $amount = null): PaymentResult
@@ -146,7 +182,7 @@ final readonly class AsaasPaymentGateway implements PaymentGateway, PaymentRecon
             ->acceptJson()
             ->asJson()
             ->withHeaders(['access_token' => $key, 'User-Agent' => 'UniformCrafted/1.0 (Laravel; production)'])
-            ->timeout(20);
+            ->timeout(65);
     }
 
     private function ensureLiveEnabled(): void
@@ -188,5 +224,28 @@ final readonly class AsaasPaymentGateway implements PaymentGateway, PaymentRecon
         $url = $payload['invoiceUrl'] ?? $payload['bankSlipUrl'] ?? null;
 
         return new PaymentResult($id, $mapped, is_string($url) ? $url : null);
+    }
+
+    /** @param array<string, mixed> $payload */
+    private function resultWithInstructions(array $payload, string $method): PaymentResult
+    {
+        $result = $this->result($payload);
+        if ($method !== 'pix') {
+            return $result;
+        }
+
+        $pix = $this->client()->get('/payments/'.$result->transactionId.'/pixQrCode')->throw()->json();
+        if (! is_array($pix) || ! is_string($pix['payload'] ?? null) || ! is_string($pix['encodedImage'] ?? null)) {
+            throw new RuntimeException('Asaas returned invalid Pix payment instructions.');
+        }
+
+        return new PaymentResult(
+            $result->transactionId,
+            $result->status,
+            $result->redirectUrl,
+            $pix['payload'],
+            $pix['encodedImage'],
+            is_string($pix['expirationDate'] ?? null) ? $pix['expirationDate'] : null,
+        );
     }
 }

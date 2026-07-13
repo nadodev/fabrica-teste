@@ -10,6 +10,7 @@ use App\Modules\Payment\Application\Command\ProcessAsaasWebhooks;
 use App\Modules\Payment\Application\Command\ProcessPayment;
 use App\Modules\Payment\Application\Command\ProcessPaymentOutbox;
 use App\Modules\Payment\Application\Command\ReconcileAsaasPayments;
+use App\Modules\Payment\Application\Command\RecoverStuckPayment;
 use App\Modules\Payment\Application\Command\RefundPayment;
 use App\Modules\Payment\Application\Exception\PaymentGatewayTimeout;
 use App\Modules\Shared\Domain\ValueObject\Money;
@@ -86,6 +87,41 @@ it('keeps timeout retryable without duplicating the provider charge', function (
     $this->assertDatabaseHas('inventory_stock_levels', ['product_id' => $productId, 'on_hand' => 3, 'reserved' => 2]);
     expect(DB::table('payment_attempts')->where('status', 'timeout')->count())->toBe(2)
         ->and(DB::table('payment_fake_transactions')->count())->toBe(1);
+});
+
+it('returns a failed Asaas attempt to pending instead of leaving it stuck processing', function () {
+    config()->set('payment.gateway', 'asaas');
+    config()->set('payment.asaas.live_enabled', false);
+    [$order] = checkoutForFakePayment();
+
+    expect(app(ProcessPaymentOutbox::class)->handle())->toBe(0);
+
+    $this->assertDatabaseHas('payment_payments', [
+        'order_id' => $order->id,
+        'status' => 'pending',
+        'failure_code' => 'gateway_error',
+    ]);
+    $this->assertDatabaseHas('payment_attempts', [
+        'payment_id' => DB::table('payment_payments')->where('order_id', $order->id)->value('id'),
+        'status' => 'failed',
+        'response_code' => 'gateway_error',
+    ]);
+});
+
+it('manually recovers only a payment stuck before receiving a provider ID', function () {
+    [$order] = checkoutForFakePayment();
+    DB::table('payment_payments')->where('order_id', $order->id)->update([
+        'status' => 'processing',
+        'provider_payment_id' => null,
+    ]);
+
+    expect(app(RecoverStuckPayment::class)->handle($order->number))->toBeTrue()
+        ->and(app(RecoverStuckPayment::class)->handle($order->number))->toBeFalse();
+    $this->assertDatabaseHas('payment_payments', [
+        'order_id' => $order->id,
+        'status' => 'pending',
+        'failure_code' => 'manual_recovery',
+    ]);
 });
 
 it('refunds an approved payment idempotently', function () {

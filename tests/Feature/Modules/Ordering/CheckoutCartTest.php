@@ -13,8 +13,10 @@ use App\Modules\Ordering\Application\DTO\CheckoutData;
 use App\Modules\Ordering\Domain\OrderStatus;
 use App\Modules\Shared\Domain\ValueObject\Money;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
+use Inertia\Testing\AssertableInertia as Assert;
 
 it('atomically snapshots a cart, reserves stock and creates one order', function () {
     $productId = '0190f566-c399-79e3-a553-7e5fb8d83460';
@@ -224,4 +226,168 @@ it('maps the public checkout request to the transactional use case', function ()
         'delivery_method' => 'pickup',
         'total_amount' => 8900,
     ]);
+});
+
+it('creates and securely displays Pix instructions immediately after checkout', function () {
+    config()->set('payment.gateway', 'asaas');
+    config()->set('payment.asaas.live_enabled', true);
+    config()->set('payment.asaas.base_url', 'https://api.asaas.com/v3');
+    config()->set('payment.asaas.api_key', '$aact_prod_test_only');
+    Http::fake([
+        'https://api.asaas.com/v3/payments?*' => Http::response(['data' => []]),
+        'https://api.asaas.com/v3/customers' => Http::response(['id' => 'cus_checkout_pix']),
+        'https://api.asaas.com/v3/payments' => Http::response([
+            'id' => 'pay_checkout_pix',
+            'status' => 'PENDING',
+            'invoiceUrl' => 'https://asaas.com/i/checkout-pix',
+        ]),
+        'https://api.asaas.com/v3/payments/pay_checkout_pix/pixQrCode' => Http::response([
+            'encodedImage' => 'aW1hZ2VtLXBpeA==',
+            'payload' => '000201PIX-CHECKOUT-SEGURO',
+            'expirationDate' => '2026-07-14 23:59:59',
+        ]),
+    ]);
+    $productId = (string) Str::uuid();
+    ProductRecord::query()->create([
+        'id' => $productId,
+        'sku' => 'PIX-HTTP-001',
+        'name' => 'Produto PIX',
+        'description' => '',
+        'price_amount' => 2500,
+        'price_currency' => 'BRL',
+        'status' => 'active',
+    ]);
+    app(DatabaseStockGateway::class)->receive('pix-http-stock', $productId, 1);
+    $token = 'pix-http-cart-token';
+    $cart = new Cart((string) Str::uuid(), hash('sha256', $token));
+    $cart->add($productId, 'Produto PIX', new Money(2500), 1, 'PIX-HTTP-001');
+    app(CartRepository::class)->save($cart);
+    $user = User::factory()->create(['name' => 'Cliente PIX', 'email' => 'pix@example.com']);
+
+    $response = $this->actingAs($user)->withSession(['cart_token' => $token])->post(route('checkout.store'), [
+        'customerName' => 'Cliente PIX',
+        'customerEmail' => 'pix@example.com',
+        'customerPhone' => '11999999999',
+        'customerDocument' => '12345678909',
+        'shippingZip' => '01001000',
+        'shippingAddress' => 'Rua PIX',
+        'shippingNumber' => '10',
+        'shippingCity' => 'Sao Paulo',
+        'shippingState' => 'SP',
+        'checkoutType' => 'payment',
+        'deliveryMethod' => 'pickup',
+        'paymentMethod' => 'pix',
+        'privacyAccepted' => true,
+    ], ['Idempotency-Key' => (string) Str::uuid()]);
+
+    $orderNumber = (string) DB::table('ordering_orders')->value('number');
+    $successUrl = route('checkout.success', ['order' => $orderNumber]);
+    $response->assertRedirect($successUrl);
+    $this->get($successUrl)->assertOk()->assertInertia(fn (Assert $page): Assert => $page
+        ->component('pedido-confirmado')
+        ->where('paymentMethod', 'pix')
+        ->where('paymentStatus', 'pending')
+        ->where('instructions.pixPayload', '000201PIX-CHECKOUT-SEGURO')
+        ->where('instructions.pixEncodedImage', 'aW1hZ2VtLXBpeA=='));
+    $this->assertDatabaseHas('payment_instructions', ['pix_payload' => '000201PIX-CHECKOUT-SEGURO']);
+
+    $other = User::factory()->create();
+    $this->actingAs($other)->withSession(['checkout_order_id' => null])->get($successUrl)->assertNotFound();
+});
+
+it('validates credit card fields without flashing the number or security code', function () {
+    config()->set('payment.gateway', 'asaas');
+
+    $response = $this->from(route('checkout'))->post(route('checkout.store'), [
+        'customerName' => 'Cliente Cartao',
+        'customerEmail' => 'cartao@example.com',
+        'customerPhone' => '11999999999',
+        'customerDocument' => '12345678909',
+        'shippingZip' => '01001000',
+        'shippingAddress' => 'Rua Cartao',
+        'shippingNumber' => '10',
+        'shippingCity' => 'Sao Paulo',
+        'shippingState' => 'SP',
+        'checkoutType' => 'payment',
+        'deliveryMethod' => 'pickup',
+        'paymentMethod' => 'credit_card',
+        'cardHolderName' => 'CLIENTE CARTAO',
+        'cardNumber' => '111111111111111a',
+        'cardExpiryMonth' => '01',
+        'cardExpiryYear' => (string) now()->subYear()->year,
+        'cardCcv' => '12',
+        'privacyAccepted' => true,
+    ]);
+
+    $response->assertUnprocessable()
+        ->assertJsonValidationErrors(['cardNumber', 'cardExpiryMonth', 'cardExpiryYear', 'cardCcv'])
+        ->assertSessionMissing('_old_input.cardNumber')
+        ->assertSessionMissing('_old_input.cardCcv');
+});
+
+it('processes a credit card immediately without persisting sensitive card data', function () {
+    config()->set('payment.gateway', 'asaas');
+    config()->set('payment.asaas.live_enabled', true);
+    config()->set('payment.asaas.base_url', 'https://api.asaas.com/v3');
+    config()->set('payment.asaas.api_key', '$aact_prod_test_only');
+    Http::fake([
+        'https://api.asaas.com/v3/payments?*' => Http::response(['data' => []]),
+        'https://api.asaas.com/v3/customers' => Http::response(['id' => 'cus_checkout_card']),
+        'https://api.asaas.com/v3/payments' => Http::response([
+            'id' => 'pay_checkout_card',
+            'status' => 'CONFIRMED',
+        ]),
+    ]);
+    $productId = (string) Str::uuid();
+    ProductRecord::query()->create([
+        'id' => $productId,
+        'sku' => 'CARD-HTTP-001',
+        'name' => 'Produto Cartao',
+        'description' => '',
+        'price_amount' => 7500,
+        'price_currency' => 'BRL',
+        'status' => 'active',
+    ]);
+    app(DatabaseStockGateway::class)->receive('card-http-stock', $productId, 1);
+    $token = 'card-http-cart-token';
+    $cart = new Cart((string) Str::uuid(), hash('sha256', $token));
+    $cart->add($productId, 'Produto Cartao', new Money(7500), 1, 'CARD-HTTP-001');
+    app(CartRepository::class)->save($cart);
+
+    $response = $this->withServerVariables(['REMOTE_ADDR' => '203.0.113.20'])
+        ->withSession(['cart_token' => $token])
+        ->post(route('checkout.store'), [
+            'customerName' => 'Cliente Cartao',
+            'customerEmail' => 'cartao@example.com',
+            'customerPhone' => '11999999999',
+            'customerDocument' => '12345678909',
+            'shippingZip' => '01001000',
+            'shippingAddress' => 'Rua Cartao',
+            'shippingNumber' => '10',
+            'shippingCity' => 'Sao Paulo',
+            'shippingState' => 'SP',
+            'checkoutType' => 'payment',
+            'deliveryMethod' => 'pickup',
+            'paymentMethod' => 'credit_card',
+            'cardHolderName' => 'CLIENTE CARTAO',
+            'cardNumber' => '5162306219378829',
+            'cardExpiryMonth' => '05',
+            'cardExpiryYear' => '2030',
+            'cardCcv' => '318',
+            'privacyAccepted' => true,
+        ], ['Idempotency-Key' => (string) Str::uuid()]);
+
+    $orderNumber = (string) DB::table('ordering_orders')->value('number');
+    $response->assertRedirect(route('checkout.success', ['order' => $orderNumber]))
+        ->assertSessionMissing('cart_token')
+        ->assertSessionMissing('_old_input.cardNumber')
+        ->assertSessionMissing('_old_input.cardCcv');
+    $this->assertDatabaseHas('payment_payments', [
+        'provider_payment_id' => 'pay_checkout_card',
+        'status' => 'paid',
+    ]);
+    Http::assertSent(fn ($request): bool => $request->url() === 'https://api.asaas.com/v3/payments'
+        && $request['creditCard']['number'] === '5162306219378829'
+        && $request['creditCard']['ccv'] === '318'
+        && $request['remoteIp'] === '203.0.113.20');
 });

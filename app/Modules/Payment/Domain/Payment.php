@@ -88,12 +88,17 @@ final class Payment
 
     public function retryAfterTimeout(): void
     {
+        $this->retryAfterFailure('timeout');
+    }
+
+    public function retryAfterFailure(string $code): void
+    {
         if ($this->status !== PaymentStatus::Processing) {
             throw new DomainException('Only a processing payment can return to pending.');
         }
 
         $this->status = PaymentStatus::Pending;
-        $this->failureCode = 'timeout';
+        $this->failureCode = $code;
         $this->version++;
     }
 

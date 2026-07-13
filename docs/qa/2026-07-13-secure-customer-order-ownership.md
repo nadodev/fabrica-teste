@@ -24,7 +24,7 @@ Vinculo e gravado dentro do checkout transacional; nenhuma operacao separada de 
 ## Casos de idempotencia
 Repeticao do carrinho retorna o pedido original e nao cria segundo vinculo; coberto pela suite de checkout; OK.
 ## Casos de regressao
-Suite completa com 53 testes e 346 assercoes aprovada.
+Suite completa com 56 testes e 374 assercoes aprovada.
 ## Casos responsivos
 Layout existente preservado; apenas texto explicativo alterado.
 ## Casos de acessibilidade

@@ -8,27 +8,31 @@ use App\Modules\Inventory\Application\Port\StockReservationLifecycle;
 use App\Modules\Inventory\Domain\Exception\ReservationConflict;
 use App\Modules\Ordering\Domain\Order;
 use App\Modules\Ordering\Domain\Port\OrderRepository;
+use App\Modules\Payment\Application\DTO\CreditCardData;
 use App\Modules\Payment\Application\DTO\PaymentRequest;
 use App\Modules\Payment\Application\Exception\PaymentGatewayTimeout;
 use App\Modules\Payment\Application\Port\PaymentGateway;
+use App\Modules\Payment\Application\Port\PaymentInstructionStore;
 use App\Modules\Payment\Application\Port\PaymentRepository;
 use App\Modules\Payment\Domain\Payment;
 use App\Modules\Payment\Domain\PaymentStatus;
 use App\Modules\Shared\Application\Port\TransactionManager;
 use DomainException;
 use Ramsey\Uuid\Uuid;
+use Throwable;
 
 final readonly class ProcessPayment
 {
     public function __construct(
         private PaymentRepository $payments,
         private PaymentGateway $gateway,
+        private PaymentInstructionStore $instructions,
         private OrderRepository $orders,
         private StockReservationLifecycle $reservations,
         private TransactionManager $transactions,
     ) {}
 
-    public function handle(string $orderId): Payment
+    public function handle(string $orderId, #[\SensitiveParameter] ?CreditCardData $creditCard = null): Payment
     {
         [$payment, $attemptId] = $this->start($orderId);
         if ($attemptId === null) {
@@ -48,13 +52,24 @@ final readonly class ProcessPayment
                     'email' => $order->details()->customerEmail,
                     'document' => $order->details()->customerDocument,
                     'phone' => $order->details()->customerPhone,
+                    'postalCode' => $order->details()->shippingZip,
+                    'addressNumber' => $order->details()->shippingNumber,
                 ],
+                creditCard: $creditCard,
             ));
         } catch (PaymentGatewayTimeout $exception) {
             $this->transactions->run(function () use ($payment, $attemptId): void {
                 $payment->retryAfterTimeout();
                 $this->payments->save($payment, 'gateway_timeout');
                 $this->payments->finishAttempt($attemptId, 'timeout', null, 'timeout');
+            });
+
+            throw $exception;
+        } catch (Throwable $exception) {
+            $this->transactions->run(function () use ($payment, $attemptId): void {
+                $payment->retryAfterFailure('gateway_error');
+                $this->payments->save($payment, 'gateway_error');
+                $this->payments->finishAttempt($attemptId, 'failed', null, 'gateway_error');
             });
 
             throw $exception;
@@ -80,6 +95,7 @@ final readonly class ProcessPayment
                 }
 
                 $this->payments->save($payment, 'gateway');
+                $this->instructions->save($payment->id, $result);
                 $this->orders->save($order);
                 $this->payments->finishAttempt($attemptId, $attemptStatus, $result->transactionId, $result->status);
             });
@@ -110,6 +126,9 @@ final readonly class ProcessPayment
             $payment = $this->payments->findByOrder($orderId, true)
                 ?? throw new DomainException('Payment intent not found.');
             if (in_array($payment->status(), [PaymentStatus::Paid, PaymentStatus::Declined], true)) {
+                return [$payment, null];
+            }
+            if ($payment->status() === PaymentStatus::Pending && $payment->providerPaymentId() !== null) {
                 return [$payment, null];
             }
             if ($payment->status() !== PaymentStatus::Pending) {

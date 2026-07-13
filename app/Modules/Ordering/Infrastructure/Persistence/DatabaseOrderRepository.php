@@ -92,6 +92,13 @@ final readonly class DatabaseOrderRepository implements OrderRepository
         return $id === null ? null : $this->find((string) $id);
     }
 
+    public function findByNumber(string $number): ?Order
+    {
+        $id = $this->database->table('ordering_orders')->where('number', $number)->value('id');
+
+        return $id === null ? null : $this->find((string) $id);
+    }
+
     public function save(Order $order): void
     {
         $this->database->transaction(function () use ($order): void {

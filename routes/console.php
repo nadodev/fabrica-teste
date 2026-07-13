@@ -5,6 +5,7 @@ use App\Modules\Ordering\Application\Command\ProcessOrderOutbox;
 use App\Modules\Payment\Application\Command\ProcessAsaasWebhooks;
 use App\Modules\Payment\Application\Command\ProcessPaymentOutbox;
 use App\Modules\Payment\Application\Command\ReconcileAsaasPayments;
+use App\Modules\Payment\Application\Command\RecoverStuckPayment;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -47,3 +48,16 @@ Artisan::command('payments:reconcile-asaas {--limit=100}', function (ReconcileAs
 })->purpose('Reconcile local payments with the current Asaas payment state');
 
 Schedule::command('payments:reconcile-asaas --limit=100')->everyFifteenMinutes()->withoutOverlapping();
+
+Artisan::command('payments:recover {order}', function (RecoverStuckPayment $recover): void {
+    $order = $this->argument('order');
+    if (! is_string($order) || $order === '') {
+        $this->error('Informe um numero de pedido valido.');
+
+        return;
+    }
+    $recovered = $recover->handle($order);
+    $recovered
+        ? $this->info('Pagamento devolvido para a fila com seguranca.')
+        : $this->warn('Pedido inexistente ou pagamento nao esta preso antes do envio ao Asaas.');
+})->purpose('Recover a payment stuck before receiving its provider transaction ID');

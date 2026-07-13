@@ -10,6 +10,9 @@ use App\Modules\Cart\Application\Query\ShowCart;
 use App\Modules\Ordering\Application\Command\CheckoutCart;
 use App\Modules\Ordering\Application\DTO\CheckoutData;
 use App\Modules\Ordering\Presentation\Http\Request\CheckoutRequest;
+use App\Modules\Payment\Application\Command\ProcessPayment;
+use App\Modules\Payment\Application\DTO\CreditCardData;
+use App\Modules\Payment\Application\Query\ShowCheckoutSuccess;
 use App\Support\StoreSettings;
 use DomainException;
 use Illuminate\Http\RedirectResponse;
@@ -19,6 +22,7 @@ use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 use RuntimeException;
+use Throwable;
 
 final class CheckoutController extends Controller
 {
@@ -49,7 +53,7 @@ final class CheckoutController extends Controller
         ]);
     }
 
-    public function store(CheckoutRequest $request, CheckoutCart $checkout): RedirectResponse
+    public function store(CheckoutRequest $request, CheckoutCart $checkout, ProcessPayment $payments): RedirectResponse
     {
         $settings = app(StoreSettings::class);
         $customers = $settings->customers();
@@ -98,11 +102,53 @@ final class CheckoutController extends Controller
             return back()->withErrors(['checkout' => $exception->getMessage()]);
         }
 
-        return to_route('checkout.success', ['order' => $order->number]);
+        $request->session()->put('checkout_order_id', $order->id);
+        $paymentError = null;
+        if ($order->details()->checkoutType === 'payment') {
+            try {
+                $card = $order->details()->paymentMethod === 'credit_card'
+                    ? new CreditCardData(
+                        (string) $data['cardHolderName'],
+                        (string) $data['cardNumber'],
+                        (string) $data['cardExpiryMonth'],
+                        (string) $data['cardExpiryYear'],
+                        (string) $data['cardCcv'],
+                        (string) ($request->ip() ?? ''),
+                    )
+                    : null;
+                $payments->handle($order->id, $card);
+            } catch (Throwable $exception) {
+                if ($order->details()->paymentMethod !== 'credit_card') {
+                    report($exception);
+                }
+                $paymentError = $order->details()->paymentMethod === 'credit_card'
+                    ? 'O pedido foi criado, mas o cartao nao foi autorizado. Confira os dados ou fale com a loja.'
+                    : 'O pedido foi criado, mas o pagamento ainda nao foi processado.';
+            }
+        }
+
+        $redirect = to_route('checkout.success', ['order' => $order->number]);
+
+        return $paymentError === null ? $redirect : $redirect->withErrors(['payment' => $paymentError]);
     }
 
-    public function success(string $order): Response
+    public function success(string $order, Request $request, ShowCheckoutSuccess $query): Response
     {
-        return Inertia::render('pedido-confirmado', ['orderNumber' => $order]);
+        $sessionOrderId = $request->session()->get('checkout_order_id');
+        $user = $request->user();
+        $view = $query->handle(
+            $order,
+            is_string($sessionOrderId) ? $sessionOrderId : null,
+            $user instanceof User ? (int) $user->getAuthIdentifier() : null,
+        );
+        abort_if($view === null, 404);
+
+        return Inertia::render('pedido-confirmado', [
+            'orderNumber' => $view->orderNumber,
+            'checkoutType' => $view->checkoutType,
+            'paymentMethod' => $view->paymentMethod,
+            'paymentStatus' => $view->paymentStatus,
+            'instructions' => $view->instructions,
+        ]);
     }
 }

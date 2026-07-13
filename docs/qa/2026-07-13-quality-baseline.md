@@ -9,7 +9,7 @@ Suite automatizada completa e build de producao.
 ## Ambiente
 Windows local, PHP 8.3.30, Node 24.14.0.
 ## Casos de sucesso
-- QLT-01: executar 53 testes e 346 assercoes; aprovado.
+- QLT-01: executar 56 testes e 374 assercoes; aprovado.
 - QLT-02: executar PHPStan; zero erros; aprovado.
 - QLT-03: executar Pint em modo teste; aprovado.
 - QLT-04: executar ESLint; aprovado.

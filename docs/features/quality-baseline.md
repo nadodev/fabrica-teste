@@ -62,7 +62,7 @@ Somente formatacao automatica; layout e comportamento visual preservados.
 
 ## Testes automatizados
 
-53 testes e 346 assercoes aprovados.
+56 testes e 374 assercoes aprovados.
 
 ## Casos de QA
 

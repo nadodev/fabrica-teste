@@ -19,8 +19,8 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->validateCsrfTokens(except: ['webhooks/asaas']);
         $middleware->redirectGuestsTo(fn (Request $request): string => $request->is('admin/*')
-            ? route('admin.login')
-            : route('cliente.login'));
+            ? '/admin/login'
+            : '/entrar');
 
         $middleware->alias([
             'admin' => EnsureUserIsAdmin::class,
@@ -34,6 +34,13 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        $exceptions->dontFlash([
+            'current_password',
+            'password',
+            'password_confirmation',
+            'cardNumber',
+            'cardCcv',
+        ]);
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );

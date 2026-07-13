@@ -36,6 +36,7 @@ Legenda: `[x]` concluido e verificado; `[ ]` ainda falta.
   - [x] PIX, boleto e cartao conforme metodos habilitados na administracao
   - [x] Segredos somente por variaveis de ambiente
   - [x] Reutilizacao de cliente e consulta por referencia antes de cobrar
+  - [x] QR Code PIX, copia e cola e atualizacao automatica na confirmacao
   - [ ] Validacao controlada com a primeira cobranca real
 - [x] Webhook, idempotencia e reconciliacao
   - [x] Validar autenticidade antes de processar
@@ -48,7 +49,7 @@ Legenda: `[x]` concluido e verificado; `[ ]` ainda falta.
   - [x] Impedir reivindicacao automatica por coincidencia de e-mail
 - [x] Cupom consumido atomicamente no checkout
 - [ ] Suite final, observabilidade, seguranca e preparacao de producao
-  - [x] Suite backend: 53 testes e 346 assercoes
+  - [x] Suite backend: 56 testes e 374 assercoes
   - [x] PHPStan sem erros
   - [x] Pint, ESLint, Prettier e TypeScript aprovados
   - [x] Build de producao aprovado

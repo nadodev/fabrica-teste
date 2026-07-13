@@ -6,7 +6,7 @@ Criar e acompanhar cobrancas Asaas sem marcar um pedido como pago antes da confi
 
 ## Escopo
 
-Clientes, PIX, boleto, cartao, estorno total e parcial, chargeback, webhook autenticado, inbox idempotente, processamento e reconciliacao agendados.
+Clientes, PIX com QR Code e copia e cola, boleto, cartao, estorno total e parcial, chargeback, webhook autenticado, inbox idempotente, processamento e reconciliacao agendados.
 
 ## Fora do escopo
 
@@ -23,10 +23,12 @@ Primeira cobranca real, ainda bloqueada por `ASAAS_LIVE_ENABLED=false`.
 - Somente estornos com estado `DONE` entram no valor devolvido.
 - Estorno parcial e cumulativo e nunca pode reduzir o valor ja registrado.
 - Chargeback permanece visivel no pagamento e no snapshot do pedido.
+- Checkout PIX cria a cobranca imediatamente, consulta `/payments/{id}/pixQrCode` e apresenta as instrucoes somente a sessao compradora ou ao dono autenticado.
+- Falha antes de receber o ID do provedor devolve o pagamento para `pending`, permitindo retry seguro.
 
 ## Fluxo principal
 
-O outbox cria/reutiliza cliente, consulta cobranca por `externalReference`, cria se ausente e persiste o ID. O endpoint `/webhooks/asaas` autentica, reduz e grava o evento; o scheduler aplica a transicao. A cada 15 minutos, pagamentos abertos sao consultados no Asaas e transformados nos mesmos eventos internos para recuperar webhooks perdidos.
+No checkout pago, a cobranca e criada imediatamente para apresentar as instrucoes ao cliente. O outbox permanece como fallback, consulta por `externalReference` antes de criar e nao duplica uma cobranca ja vinculada. O endpoint `/webhooks/asaas` autentica, reduz e grava o evento; o scheduler aplica a transicao. A cada 15 minutos, pagamentos abertos sao consultados no Asaas e transformados nos mesmos eventos internos para recuperar webhooks perdidos.
 
 ## Fluxos alternativos
 
@@ -66,7 +68,7 @@ Somente eventos de cobrancas selecionados no Asaas sao aceitos e novos campos de
 
 ## Interface
 
-A URL publica configurada e `https://fabricafardamento.gejalabs.com.br/webhooks/asaas`.
+A URL publica configurada e `https://fabricafardamento.gejalabs.com.br/webhooks/asaas`. A pagina de confirmacao exibe QR Code, copia e cola, vencimento e atualiza o estado automaticamente.
 
 ## Testes automatizados
 
