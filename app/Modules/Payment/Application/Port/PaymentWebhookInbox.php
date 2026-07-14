@@ -14,5 +14,10 @@ interface PaymentWebhookInbox
 
     public function processed(string $id): void;
 
-    public function retry(string $id, string $error): void;
+    public function retry(string $id, string $error, int $maxAttempts): void;
+
+    public function recoverStale(int $staleAfterMinutes, int $maxAttempts): int;
+
+    /** @return array{pending: int, processing: int, failed: int} */
+    public function statusCounts(): array;
 }

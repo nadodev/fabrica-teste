@@ -30,3 +30,16 @@ it('creates an immutable-priced order awaiting payment', function () {
 it('rejects orders without items', function () {
     Order::place('order-1', 'PED-00000001', 'cart-1', [], orderDetails());
 })->throws(DomainException::class);
+
+it('only allows valid administrative status transitions', function () {
+    $order = Order::place('order-2', 'PED-00000002', 'cart-2', [
+        new OrderItem('product-1', 'SKU-1', 'Camisa', new Money(7990), 1),
+    ], orderDetails());
+    $order->markPaid();
+    $order->changeAdministrativeStatus(OrderStatus::Processing);
+    $order->changeAdministrativeStatus(OrderStatus::Shipped);
+    $order->changeAdministrativeStatus(OrderStatus::Delivered);
+
+    expect($order->status())->toBe(OrderStatus::Delivered);
+    $order->changeAdministrativeStatus(OrderStatus::Processing);
+})->throws(DomainException::class);

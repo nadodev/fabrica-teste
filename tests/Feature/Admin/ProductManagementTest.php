@@ -34,6 +34,10 @@ it('allows an administrator to create a server-priced product', function () {
         'price' => '79,90',
         'status' => 'active',
         'imageUrl' => null,
+        'weightGrams' => 850,
+        'widthCentimeters' => 24,
+        'heightCentimeters' => 8,
+        'lengthCentimeters' => 35,
     ];
 
     $this->actingAs($admin)
@@ -44,6 +48,10 @@ it('allows an administrator to create a server-priced product', function () {
         'sku' => 'ADMIN-001',
         'price_amount' => 7990,
         'status' => 'active',
+        'weight_grams' => 850,
+        'width_centimeters' => 24,
+        'height_centimeters' => 8,
+        'length_centimeters' => 35,
     ]);
 
     $this->actingAs($admin)->get(route('admin.products.index'))->assertInertia(fn (Assert $page) => $page

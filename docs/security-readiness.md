@@ -6,7 +6,7 @@
 
 ## Resumo executivo
 
-O sistema atual é uma vitrine de catálogo, não um e-commerce operacional. O Catálogo possui separação arquitetural e leitura persistida, mas carrinho, estoque, pedidos, pagamentos e frete ainda não formam fluxos transacionais. A superfície atual é majoritariamente de leitura; os maiores riscos surgirão na introdução do checkout e do painel administrativo.
+O sistema atual ja possui fluxo operacional de catalogo, carrinho, estoque, checkout, pedidos, frete e pagamento. Os riscos restantes concentram-se em permissoes administrativas granulares, tokenizacao de cartao, observabilidade, backup MySQL, LGPD e validacao concorrente em InnoDB.
 
 ## Controles existentes
 
@@ -28,7 +28,7 @@ O sistema atual é uma vitrine de catálogo, não um e-commerce operacional. O C
 2. **Estoque sem controle concorrente:** duas compras simultâneas podem vender a última unidade.
 3. **Ausência de agregado de Pedido:** não existe snapshot imutável de itens, preços, cliente, endereço e totais.
 4. **Ausência de persistência de Pagamento:** transações, tentativas, estornos e eventos do gateway não são auditáveis.
-5. **Webhooks não implementados:** faltam assinatura, prevenção de replay, idempotência e reconciliação.
+5. **Webhooks implementados:** autenticacao por token, inbox idempotente, processamento imediato, retry, recuperacao de claims, dead-letter e reconciliacao estao presentes; faltam alertas externos e runbook operacional.
 
 ### P1 — necessários antes de administração pública
 
@@ -101,4 +101,3 @@ SESSION_ENCRYPT=true
 - Testes de checkout, falhas, retries, estorno e expiração de reservas.
 - TLS, headers, logs, alertas, backups e restauração validados.
 - Política de privacidade, termos, atendimento e regras de cancelamento publicados.
-

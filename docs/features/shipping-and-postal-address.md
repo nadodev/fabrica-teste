@@ -26,6 +26,8 @@ Compra e impressao de etiquetas, renovacao OAuth automatica e persistencia de ba
 - Novos pedidos aceitam somente entrega por frete; retirada na loja nao faz parte do checkout.
 - Sem uma cotacao selecionada, o carrinho nao libera a finalizacao e o acesso direto ao checkout volta ao carrinho.
 - Frete gratis e aplicado automaticamente quando estiver habilitado e o valor dos produtos, depois do desconto, atingir o minimo configurado em reais.
+- Peso e dimensoes do produto embalado sao enviados por item ao provedor.
+- O servico escolhido e consultado novamente no checkout; preco e prazo da sessao nao sao fonte definitiva.
 
 ## Fluxo principal
 
@@ -53,7 +55,7 @@ Nao ha persistencia de endereco consultado. O cache expira em 24 horas. A coluna
 
 ## Transacoes
 
-Nao aplicavel as consultas externas. A cotacao selecionada continua sendo congelada pelo checkout transacional existente.
+A consulta externa ocorre antes da transacao de escrita. Uma fingerprint do carrinho e confirmada dentro da transacao; se itens, quantidades, variacoes ou precos mudarem, a compra exige novo calculo.
 
 ## Idempotencia
 

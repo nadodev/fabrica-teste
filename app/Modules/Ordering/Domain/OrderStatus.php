@@ -14,4 +14,16 @@ enum OrderStatus: string
     case Delivered = 'delivered';
     case Cancelled = 'cancelled';
     case Refunded = 'refunded';
+
+    /** @return list<self> */
+    public function allowedAdministrativeTransitions(): array
+    {
+        return match ($this) {
+            self::QuoteRequested, self::AwaitingPayment => [],
+            self::Paid => [self::Processing],
+            self::Processing => [self::Shipped],
+            self::Shipped => [self::Delivered],
+            self::Delivered, self::Cancelled, self::Refunded => [],
+        };
+    }
 }

@@ -6,14 +6,14 @@ namespace App\Modules\Cart\Presentation\Http;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Cart\Application\Query\ShowCart;
-use App\Support\MelhorEnvioClient;
+use App\Modules\Shipping\Application\Query\QuoteCartShipping;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use RuntimeException;
 
 final class ShippingController extends Controller
 {
-    public function quote(Request $request, ShowCart $cart, MelhorEnvioClient $melhorEnvio): RedirectResponse
+    public function quote(Request $request, ShowCart $cart, QuoteCartShipping $shipping): RedirectResponse
     {
         $data = $request->validate([
             'zip' => ['required', 'string', 'regex:/^(?:\D*\d){8}\D*$/'],
@@ -26,7 +26,7 @@ final class ShippingController extends Controller
         }
 
         try {
-            $quotes = $melhorEnvio->quote((string) $data['zip'], $view);
+            $quotes = array_map($shipping->toArray(...), $shipping->handle((string) $data['zip'], $view));
         } catch (RuntimeException $exception) {
             return back()->withErrors(['shipping' => $exception->getMessage()]);
         }

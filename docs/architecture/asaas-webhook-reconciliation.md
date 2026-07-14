@@ -10,7 +10,7 @@ O envio de webhook e pelo menos uma vez e pode sofrer atraso. Em hospedagem sem 
 
 ## Fluxo
 
-O controller autentica, saneia e persiste o evento, então chama `ProcessAsaasWebhooks::handleEvent` com o ID recebido. A inbox faz claim atomico somente se ele estiver pendente. Falha de aplicacao devolve o evento para `pending` com backoff. `ReconcileAsaasPayments` seleciona pagamentos abertos, consulta `GET /payments/{id}`, reduz a resposta a campos financeiros seguros e cria um ID deterministico pelo estado observado. O mesmo processador aplica aprovacao, recusa, estorno ou chargeback dentro da transacao local.
+O controller autentica, saneia e persiste o evento, então chama `ProcessAsaasWebhooks::handleEvent` com o ID recebido. A inbox faz claim atomico somente se ele estiver pendente. Falha de aplicacao devolve o evento para `pending` com backoff. Claims interrompidos expiram e voltam para a fila; ao atingir o limite configurado, o evento muda para `failed`. `ReconcileAsaasPayments` seleciona pagamentos abertos, consulta `GET /payments/{id}`, reduz a resposta a campos financeiros seguros e cria um ID deterministico pelo estado observado. O mesmo processador aplica aprovacao, recusa, estorno ou chargeback dentro da transacao local.
 
 ## Persistencia e idempotencia
 

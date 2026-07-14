@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Catalog\Domain;
 
 use App\Modules\Catalog\Domain\ValueObject\ProductId;
+use App\Modules\Catalog\Domain\ValueObject\ShippingProfile;
 use App\Modules\Catalog\Domain\ValueObject\Sku;
 use App\Modules\Shared\Domain\ValueObject\Money;
 use InvalidArgumentException;
@@ -32,11 +33,13 @@ final class Product
         private string $category = 'Uniformes',
         array $galleryImages = [],
         array $variations = [],
+        private ?ShippingProfile $shippingProfile = null,
     ) {
         $this->rename($name);
         $this->category = $this->sanitizeCategory($category);
         $this->galleryImages = $this->sanitizeGallery($galleryImages);
         $this->variations = $this->sanitizeVariations($variations);
+        $this->shippingProfile ??= new ShippingProfile(300, 20, 5, 30);
     }
 
     public function rename(string $name): void
@@ -53,7 +56,7 @@ final class Product
      * @param  list<string>  $galleryImages
      * @param  list<array{id?: string, name: string, value: string, sku?: string}>  $variations
      */
-    public function updateDetails(string $name, string $description, Money $price, ProductStatus $status, ?string $imageUrl, string $category = 'Uniformes', array $galleryImages = [], array $variations = []): void
+    public function updateDetails(string $name, string $description, Money $price, ProductStatus $status, ?string $imageUrl, string $category = 'Uniformes', array $galleryImages = [], array $variations = [], ?ShippingProfile $shippingProfile = null): void
     {
         if (mb_strlen($description) > 5000) {
             throw new InvalidArgumentException('Product description cannot exceed 5000 characters.');
@@ -67,6 +70,7 @@ final class Product
         $this->category = $this->sanitizeCategory($category);
         $this->galleryImages = $this->sanitizeGallery($galleryImages);
         $this->variations = $this->sanitizeVariations($variations);
+        $this->shippingProfile = $shippingProfile ?? $this->shippingProfile;
     }
 
     public function activate(): void
@@ -119,6 +123,11 @@ final class Product
     public function variations(): array
     {
         return $this->variations;
+    }
+
+    public function shippingProfile(): ShippingProfile
+    {
+        return $this->shippingProfile ?? new ShippingProfile(300, 20, 5, 30);
     }
 
     public function variationLabel(?string $variationId): ?string

@@ -63,6 +63,28 @@ it('does not apply free shipping below the configured minimum', function () {
         ->assertSessionHasErrors('shipping');
 });
 
+it('does not trust a forged free shipping quote below the configured minimum', function () {
+    configureFreeShipping('200.00');
+    [$token] = shippingRequirementCart(10000);
+
+    $this->from(route('checkout'))->withSession([
+        'cart_token' => $token,
+        'shipping_quote' => [
+            'serviceId' => 'free-shipping', 'name' => 'Frete gratis', 'companyName' => 'Loja',
+            'priceAmount' => 0, 'deliveryTime' => 0,
+        ],
+    ])->post(route('checkout.store'), [
+        'customerName' => 'Cliente', 'customerEmail' => 'cliente@example.com', 'customerPhone' => '11999999999',
+        'shippingZip' => '01001000', 'shippingAddress' => 'Rua Teste', 'shippingNumber' => '10',
+        'shippingCity' => 'Sao Paulo', 'shippingState' => 'SP', 'checkoutType' => 'quote',
+        'deliveryMethod' => 'shipping', 'paymentMethod' => 'combine', 'privacyAccepted' => true,
+    ], ['Idempotency-Key' => (string) Str::uuid()])
+        ->assertRedirect(route('checkout'))
+        ->assertSessionHasErrors('checkout');
+
+    $this->assertDatabaseCount('ordering_orders', 0);
+});
+
 it('rejects pickup as a delivery method for new checkouts', function () {
     $this->from(route('checkout'))->post(route('checkout.store'), [
         'customerName' => 'Cliente',

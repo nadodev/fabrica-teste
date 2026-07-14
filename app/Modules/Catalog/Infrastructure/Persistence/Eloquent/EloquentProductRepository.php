@@ -8,6 +8,7 @@ use App\Modules\Catalog\Domain\Port\ProductRepository;
 use App\Modules\Catalog\Domain\Product;
 use App\Modules\Catalog\Domain\ProductStatus;
 use App\Modules\Catalog\Domain\ValueObject\ProductId;
+use App\Modules\Catalog\Domain\ValueObject\ShippingProfile;
 use App\Modules\Catalog\Domain\ValueObject\Sku;
 use App\Modules\Shared\Domain\ValueObject\Money;
 
@@ -45,6 +46,10 @@ final class EloquentProductRepository implements ProductRepository
             'category' => $product->category(),
             'price_amount' => $product->price()->amount,
             'price_currency' => $product->price()->currency,
+            'weight_grams' => $product->shippingProfile()->weightGrams,
+            'width_centimeters' => $product->shippingProfile()->widthCentimeters,
+            'height_centimeters' => $product->shippingProfile()->heightCentimeters,
+            'length_centimeters' => $product->shippingProfile()->lengthCentimeters,
             'status' => $product->status()->value,
             'image_url' => $product->imageUrl(),
             'gallery_images' => $product->galleryImages(),
@@ -65,6 +70,12 @@ final class EloquentProductRepository implements ProductRepository
             (string) ($record->getAttribute('category') ?? 'Uniformes'),
             $this->galleryImages($record->getAttribute('gallery_images')),
             $this->variations($record->getAttribute('variations')),
+            new ShippingProfile(
+                (int) ($record->getAttribute('weight_grams') ?? 300),
+                (int) ($record->getAttribute('width_centimeters') ?? 20),
+                (int) ($record->getAttribute('height_centimeters') ?? 5),
+                (int) ($record->getAttribute('length_centimeters') ?? 30),
+            ),
         );
     }
 

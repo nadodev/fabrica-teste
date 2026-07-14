@@ -12,6 +12,9 @@ use App\Modules\Ordering\Application\Command\ProcessOrderOutbox;
 use App\Modules\Ordering\Application\DTO\CheckoutData;
 use App\Modules\Ordering\Domain\OrderStatus;
 use App\Modules\Shared\Domain\ValueObject\Money;
+use App\Modules\Shipping\Application\DTO\ShippingOption;
+use App\Modules\Shipping\Application\DTO\ShippingQuoteRequest;
+use App\Modules\Shipping\Application\Port\ShippingQuoteGateway;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
@@ -90,7 +93,7 @@ it('persists the complete checkout snapshot and consumes a coupon inside the tra
     $order = app(CheckoutCart::class)->handle((string) Str::uuid(), $token, new CheckoutData(
         'payment', 'Maria Cliente', 'maria@example.com', '11999999999', '12345678901',
         '01001000', 'Praca da Se', '100', 'Sao Paulo', 'SP', 'shipping', 'pix', 'Entregar na recepcao',
-        'PRIMEIRA10', ['name' => 'PAC', 'companyName' => 'Correios', 'priceAmount' => 1500, 'deliveryTime' => 5],
+        'PRIMEIRA10', ['serviceId' => 'pac-test', 'name' => 'PAC', 'companyName' => 'Correios', 'priceAmount' => 1500, 'deliveryTime' => 5],
     ));
 
     expect($order->subtotal()->amount)->toBe(10000)
@@ -107,6 +110,37 @@ it('persists the complete checkout snapshot and consumes a coupon inside the tra
         'total_amount' => 10500,
     ]);
     $this->assertDatabaseHas('commerce_coupons', ['code' => 'PRIMEIRA10', 'used_count' => 1]);
+});
+
+it('revalidates the selected shipping service and ignores the session price', function () {
+    $this->app->instance(ShippingQuoteGateway::class, new class implements ShippingQuoteGateway
+    {
+        public function quote(ShippingQuoteRequest $request): array
+        {
+            return [new ShippingOption('live-service', 'Entrega atualizada', 'Transportadora', 2300, 'BRL', 4)];
+        }
+    });
+    $productId = (string) Str::uuid();
+    ProductRecord::query()->create([
+        'id' => $productId, 'sku' => 'FRETE-LIVE', 'name' => 'Produto frete real', 'description' => '',
+        'price_amount' => 10000, 'price_currency' => 'BRL', 'status' => 'active',
+        'weight_grams' => 1200, 'width_centimeters' => 25, 'height_centimeters' => 10, 'length_centimeters' => 40,
+    ]);
+    app(DatabaseStockGateway::class)->receive('shipping-live-stock', $productId, 1);
+    $token = 'shipping-live-token';
+    $cart = new Cart((string) Str::uuid(), hash('sha256', $token));
+    $cart->add($productId, 'Produto frete real', new Money(10000), 1, 'FRETE-LIVE');
+    app(CartRepository::class)->save($cart);
+
+    $order = app(CheckoutCart::class)->handle((string) Str::uuid(), $token, new CheckoutData(
+        'quote', 'Cliente', 'cliente@example.com', '11999999999', null,
+        '01001000', 'Rua Teste', '10', 'Sao Paulo', 'SP', 'shipping', 'combine', null, null,
+        ['serviceId' => 'live-service', 'name' => 'Valor adulterado', 'companyName' => 'Outra', 'priceAmount' => 1, 'deliveryTime' => 99],
+    ));
+
+    expect($order->details()->shipping->amount)->toBe(2300)
+        ->and($order->details()->shippingService)->toBe('Entrega atualizada')
+        ->and($order->total()->amount)->toBe(12300);
 });
 
 it('rolls back coupon usage, order and outbox when stock reservation fails', function () {

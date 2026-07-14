@@ -100,7 +100,7 @@ final class Order
 
     public function markRefunded(): void
     {
-        if ($this->status !== OrderStatus::Paid) {
+        if (! in_array($this->status, [OrderStatus::Paid, OrderStatus::Processing, OrderStatus::Shipped, OrderStatus::Delivered], true)) {
             throw new DomainException('Only a paid order can be refunded.');
         }
 
@@ -111,5 +111,18 @@ final class Order
     public function recordPaymentStatus(string $status): void
     {
         $this->details = $this->details->withPaymentStatus($status);
+    }
+
+    public function changeAdministrativeStatus(OrderStatus $next): void
+    {
+        if ($next === $this->status) {
+            return;
+        }
+
+        if (! in_array($next, $this->status->allowedAdministrativeTransitions(), true)) {
+            throw new DomainException("Order status cannot change from {$this->status->value} to {$next->value}.");
+        }
+
+        $this->status = $next;
     }
 }

@@ -12,6 +12,8 @@ interface OrderRepository
 
     public function find(string $id): ?Order;
 
+    public function findForUpdate(string $id): ?Order;
+
     public function findByNumber(string $number): ?Order;
 
     public function findByCartId(string $cartId): ?Order;

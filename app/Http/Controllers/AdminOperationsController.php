@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Modules\Payment\Application\Query\ShowPaymentWebhookHealth;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
@@ -12,8 +13,10 @@ use Inertia\Response;
 
 final class AdminOperationsController extends Controller
 {
-    public function index(): Response
+    public function index(ShowPaymentWebhookHealth $webhooks): Response
     {
+        $health = $webhooks->handle();
+
         return Inertia::render('admin/operations', [
             'checks' => [
                 ['label' => 'Rate limit catalogo', 'value' => '120 req/min por IP'],
@@ -21,6 +24,9 @@ final class AdminOperationsController extends Controller
                 ['label' => 'Rate limit login', 'value' => '5 req/min por email/IP'],
                 ['label' => 'Ambiente', 'value' => app()->environment()],
                 ['label' => 'Mailer', 'value' => config('mail.default')],
+                ['label' => 'Webhooks Asaas pendentes', 'value' => (string) $health['pending']],
+                ['label' => 'Webhooks Asaas processando', 'value' => (string) $health['processing']],
+                ['label' => 'Webhooks Asaas com falha final', 'value' => (string) $health['failed']],
             ],
             'logs' => $this->recentLogs(),
             'backups' => collect(Storage::disk('local')->files('backups'))

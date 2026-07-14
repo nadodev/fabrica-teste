@@ -28,6 +28,10 @@ final readonly class ProductView
         public int $stockAvailable = 0,
         public bool $canSellWithoutStock = false,
         public bool $showStockAlerts = true,
+        public int $weightGrams = 300,
+        public int $widthCentimeters = 20,
+        public int $heightCentimeters = 5,
+        public int $lengthCentimeters = 30,
     ) {}
 
     /** @param list<StockLevel> $stockLevels */
@@ -70,6 +74,10 @@ final readonly class ProductView
             max($stockAvailable, 0),
             $allowOutOfStock,
             $showStockAlerts,
+            $product->shippingProfile()->weightGrams,
+            $product->shippingProfile()->widthCentimeters,
+            $product->shippingProfile()->heightCentimeters,
+            $product->shippingProfile()->lengthCentimeters,
         );
     }
 }

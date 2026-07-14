@@ -13,12 +13,16 @@ final class ProductRecord extends Model
 
     protected $table = 'catalog_products';
 
-    protected $fillable = ['id', 'sku', 'name', 'description', 'category', 'price_amount', 'price_currency', 'status', 'image_url', 'gallery_images', 'variations'];
+    protected $fillable = ['id', 'sku', 'name', 'description', 'category', 'price_amount', 'price_currency', 'weight_grams', 'width_centimeters', 'height_centimeters', 'length_centimeters', 'status', 'image_url', 'gallery_images', 'variations'];
 
     protected function casts(): array
     {
         return [
             'price_amount' => 'integer',
+            'weight_grams' => 'integer',
+            'width_centimeters' => 'integer',
+            'height_centimeters' => 'integer',
+            'length_centimeters' => 'integer',
             'gallery_images' => 'array',
             'variations' => 'array',
         ];

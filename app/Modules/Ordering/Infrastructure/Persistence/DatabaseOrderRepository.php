@@ -30,14 +30,23 @@ final readonly class DatabaseOrderRepository implements OrderRepository
 
     public function find(string $id): ?Order
     {
-        $record = $this->database->table('ordering_orders')->where('id', $id)->first();
+        return $this->hydrate($this->database->table('ordering_orders')->where('id', $id)->first());
+    }
+
+    public function findForUpdate(string $id): ?Order
+    {
+        return $this->hydrate($this->database->table('ordering_orders')->where('id', $id)->lockForUpdate()->first());
+    }
+
+    private function hydrate(?object $record): ?Order
+    {
 
         if ($record === null) {
             return null;
         }
 
         $row = (array) $record;
-        $items = $this->database->table('ordering_order_items')->where('order_id', $id)->orderBy('id')->get()
+        $items = $this->database->table('ordering_order_items')->where('order_id', $row['id'])->orderBy('id')->get()
             ->map(fn (object $item): OrderItem => new OrderItem(
                 (string) $item->product_id,
                 (string) $item->sku,
@@ -103,7 +112,8 @@ final readonly class DatabaseOrderRepository implements OrderRepository
     {
         $this->database->transaction(function () use ($order): void {
             $details = $order->details();
-            $this->database->table('ordering_orders')->updateOrInsert(['id' => $order->id], [
+            $exists = $this->database->table('ordering_orders')->where('id', $order->id)->exists();
+            $values = [
                 'number' => $order->number,
                 'cart_id' => $order->cartId,
                 'status' => $order->status()->value,
@@ -131,10 +141,16 @@ final readonly class DatabaseOrderRepository implements OrderRepository
                 'coupon_code' => $details->couponCode,
                 'total_amount' => $order->total()->amount,
                 'currency' => $order->total()->currency,
-                'created_at' => now(),
                 'updated_at' => now(),
-            ]);
-            $this->database->table('ordering_order_items')->where('order_id', $order->id)->delete();
+            ];
+
+            if ($exists) {
+                $this->database->table('ordering_orders')->where('id', $order->id)->update($values);
+
+                return;
+            }
+
+            $this->database->table('ordering_orders')->insert(['id' => $order->id, ...$values, 'created_at' => now()]);
 
             foreach ($order->items() as $item) {
                 $this->database->table('ordering_order_items')->insert([

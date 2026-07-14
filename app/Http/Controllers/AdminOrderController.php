@@ -4,111 +4,56 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\UpdateAdminOrderStatusRequest;
+use App\Modules\Ordering\Application\Command\ChangeOrderStatus;
+use App\Modules\Ordering\Application\Port\AdminOrderReadModel;
+use App\Modules\Ordering\Domain\OrderStatus;
+use DomainException;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
 final class AdminOrderController extends Controller
 {
-    public function index(): Response
+    public function index(AdminOrderReadModel $orders): Response
     {
-        $orders = DB::table('ordering_orders')
-            ->orderByDesc('created_at')
-            ->get()
-            ->map(fn (object $order): array => [
-                'id' => (string) $order->id,
-                'number' => (string) $order->number,
-                'customerName' => (string) ($order->customer_name ?? 'Cliente nao informado'),
-                'customerEmail' => $order->customer_email,
-                'customerPhone' => $order->customer_phone,
-                'status' => (string) $order->status,
-                'checkoutType' => (string) ($order->checkout_type ?? 'payment'),
-                'subtotalAmount' => (int) ($order->subtotal_amount ?? $order->total_amount),
-                'discountAmount' => (int) ($order->discount_amount ?? 0),
-                'shippingAmount' => (int) ($order->shipping_amount ?? 0),
-                'totalAmount' => (int) $order->total_amount,
-                'currency' => (string) $order->currency,
-                'couponCode' => $order->coupon_code,
-                'paymentMethod' => $order->payment_method ?? null,
-                'paymentStatus' => $order->payment_status ?? null,
-                'createdAt' => (string) $order->created_at,
-            ]);
+        $records = array_map(fn (array $order): array => [
+            ...$order,
+            'allowedStatuses' => $this->statusOptions(OrderStatus::from((string) $order['status'])),
+        ], $orders->all());
 
         return Inertia::render('admin/orders/index', [
-            'orders' => $orders,
+            'orders' => $records,
             'statuses' => $this->statuses(),
         ]);
     }
 
-    public function show(string $order): Response
+    public function show(string $order, AdminOrderReadModel $orders): Response
     {
-        $record = DB::table('ordering_orders')->where('id', $order)->first();
+        $record = $orders->find($order);
         abort_if($record === null, 404);
 
-        $items = DB::table('ordering_order_items')
-            ->where('order_id', $order)
-            ->orderBy('id')
-            ->get()
-            ->map(fn (object $item): array => [
-                'productId' => (string) $item->product_id,
-                'sku' => (string) $item->sku,
-                'name' => (string) $item->name,
-                'variationLabel' => $item->variation_label,
-                'notes' => $item->notes,
-                'unitPriceAmount' => (int) $item->unit_price_amount,
-                'priceCurrency' => (string) $item->price_currency,
-                'quantity' => (int) $item->quantity,
-                'subtotalAmount' => (int) $item->subtotal_amount,
-            ]);
-
         return Inertia::render('admin/orders/show', [
-            'order' => [
-                'id' => (string) $record->id,
-                'number' => (string) $record->number,
-                'status' => (string) $record->status,
-                'checkoutType' => (string) ($record->checkout_type ?? 'payment'),
-                'customerName' => $record->customer_name,
-                'customerEmail' => $record->customer_email,
-                'customerPhone' => $record->customer_phone,
-                'customerDocument' => $record->customer_document,
-                'shippingZip' => $record->shipping_zip,
-                'shippingAddress' => $record->shipping_address,
-                'shippingNumber' => $record->shipping_number,
-                'shippingCity' => $record->shipping_city,
-                'shippingState' => $record->shipping_state,
-                'deliveryMethod' => $record->delivery_method ?? 'shipping',
-                'shippingService' => $record->shipping_service ?? null,
-                'shippingCompany' => $record->shipping_company ?? null,
-                'shippingAmount' => (int) ($record->shipping_amount ?? 0),
-                'shippingDeliveryTime' => $record->shipping_delivery_time ?? null,
-                'paymentMethod' => $record->payment_method ?? null,
-                'paymentStatus' => $record->payment_status ?? null,
-                'notes' => $record->notes,
-                'subtotalAmount' => (int) ($record->subtotal_amount ?? $record->total_amount),
-                'discountAmount' => (int) ($record->discount_amount ?? 0),
-                'totalAmount' => (int) $record->total_amount,
-                'currency' => (string) $record->currency,
-                'couponCode' => $record->coupon_code,
-                'createdAt' => (string) $record->created_at,
-                'items' => $items,
-            ],
+            'order' => $record,
             'statuses' => $this->statuses(),
+            'allowedStatuses' => $this->statusOptions(OrderStatus::from((string) $record['status'])),
+            'statusHistory' => $orders->statusHistory($order),
         ]);
     }
 
-    public function updateStatus(string $order, Request $request): RedirectResponse
+    public function updateStatus(string $order, UpdateAdminOrderStatusRequest $request, ChangeOrderStatus $command): RedirectResponse
     {
-        $data = $request->validate([
-            'status' => ['required', Rule::in(array_keys($this->statuses()))],
-        ]);
-
-        DB::table('ordering_orders')->where('id', $order)->update([
-            'status' => $data['status'],
-            'updated_at' => now(),
-        ]);
+        $data = $request->validated();
+        try {
+            $command->handle(
+                $order,
+                (string) $data['status'],
+                (int) $request->user()->getAuthIdentifier(),
+                isset($data['note']) ? (string) $data['note'] : null,
+            );
+        } catch (DomainException $exception) {
+            return back()->withErrors(['status' => $exception->getMessage()]);
+        }
 
         return back()->with('success', 'Status do pedido atualizado.');
     }
@@ -126,5 +71,13 @@ final class AdminOrderController extends Controller
             'cancelled' => 'Cancelado',
             'refunded' => 'Reembolsado',
         ];
+    }
+
+    /** @return array<string, string> */
+    private function statusOptions(OrderStatus $current): array
+    {
+        $allowed = [$current, ...$current->allowedAdministrativeTransitions()];
+
+        return array_intersect_key($this->statuses(), array_flip(array_map(fn (OrderStatus $status): string => $status->value, $allowed)));
     }
 }

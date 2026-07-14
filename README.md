@@ -8,7 +8,7 @@ Loja virtual modular com Laravel, Inertia e React. Um projeto de portfólio cria
 
 ## PROGRESSO
 
-**70%**
+**Em evolucao para operacao completa em producao**
 
 [Repositório](https://github.com/nadodev/fabrica-teste)
 
@@ -16,7 +16,7 @@ Loja virtual modular com Laravel, Inertia e React. Um projeto de portfólio cria
 
 Uma loja virtual de uniformes criada para praticar modelagem de domínio e evolução sustentável de software. O objetivo é construir catálogo, estoque, carrinho, pedidos, pagamentos e fretes sem acoplar as regras de negócio ao Laravel, ao banco de dados ou a fornecedores externos.
 
-A primeira entrega estabelece a arquitetura, implementa o Catálogo como corte vertical funcional, conecta o backend à página de produtos pelo Inertia e define as portas que permitirão adicionar gateways de pagamento, transportadoras e mecanismos de estoque.
+A aplicacao ja opera catalogo, estoque, carrinho, checkout, clientes, pedidos, cupons, frete pelo Melhor Envio e pagamentos reais pelo Asaas. A etapa atual fortalece logistica, seguranca, observabilidade e operacao de producao.
 
 ## Arquitetura
 
@@ -89,7 +89,7 @@ ADRs registram o contexto e as consequências das decisões mais importantes.
 - Catálogo implementado do domínio à interface.
 - Persistência de produtos com adaptador Eloquent.
 - Dados demonstrativos reproduzíveis.
-- Contratos iniciais de estoque, carrinho, pedidos, pagamentos e frete.
+- Estoque unificado por SKU/variacao, carrinho persistido, pedidos e checkout transacional.
 - Testes unitários, funcionais e arquiteturais.
 - Idempotência persistida para comandos comerciais.
 - Estoque transacional com reservas e ledger de movimentações.
@@ -98,17 +98,18 @@ ADRs registram o contexto e as consequências das decisões mais importantes.
 - Pedidos com snapshots imutáveis dos itens.
 - Dashboard administrativo protegido para cadastrar e publicar produtos.
 - Edição, arquivamento e upload validado de imagens no dashboard.
+- Gateway falso e integracao real Asaas com Pix, cartao, boleto, webhook, reconciliacao e estorno.
+- Melhor Envio com credencial no ambiente, peso e dimensoes por produto e revalidacao no checkout.
+- Cadastro de clientes e enderecos com preenchimento automatico por CEP.
+- Maquina de estados administrativa e historico auditavel do pedido.
 
 ## Próximas etapas
 
-- Persistir carrinhos e adicionar itens pela interface.
-- Modelar checkout e ciclo de vida dos pedidos.
-- Criar um gateway de pagamento falso para desenvolvimento.
-- Adicionar o primeiro adaptador real de pagamento.
-- Implementar cotação de frete por adaptadores.
-- Criar área administrativa, autenticação e autorização.
-- Evoluir o dashboard com variantes e gestão de estoque.
-- Implementar outbox, webhooks assinados e observabilidade.
+- Completar etiqueta, expedicao e rastreamento no Melhor Envio.
+- Adicionar detalhe do pedido para o cliente e repeticao segura de pagamento.
+- Implementar recuperacao de senha, verificacao de e-mail e permissoes administrativas especificas.
+- Paginar consultas administrativas e adicionar cache de configuracoes publicas.
+- Implantar backup/restauracao MySQL, metricas, alertas e testes concorrentes em InnoDB.
 
 O diagnóstico completo está em [docs/security-readiness.md](docs/security-readiness.md), e o plano funcional em [docs/ecommerce-roadmap.md](docs/ecommerce-roadmap.md).
 

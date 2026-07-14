@@ -30,8 +30,14 @@ it('generates sequential public numbers and persists item snapshots', function (
     ));
     $repository->save($order);
 
+    $createdAt = DB::table('ordering_orders')->where('id', $order->id)->value('created_at');
+    $order->markPaid();
+    $repository->save($order);
+
     expect($number)->toBe('PED-00000001')
         ->and($repository->nextIdentity())->toBe('PED-00000002')
         ->and($repository->find($order->id)?->total()->amount)->toBe(21980);
+    expect((string) DB::table('ordering_orders')->where('id', $order->id)->value('created_at'))->toBe((string) $createdAt);
     $this->assertDatabaseHas('ordering_order_items', ['name' => 'Nome no momento da compra', 'unit_price_amount' => 10990]);
+    $this->assertDatabaseCount('ordering_order_items', 1);
 });

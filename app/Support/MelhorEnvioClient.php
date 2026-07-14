@@ -4,13 +4,15 @@ declare(strict_types=1);
 
 namespace App\Support;
 
-use App\Modules\Cart\Application\DTO\CartView;
+use App\Modules\Shipping\Application\DTO\ShippingOption;
+use App\Modules\Shipping\Application\DTO\ShippingQuoteRequest;
+use App\Modules\Shipping\Application\Port\ShippingQuoteGateway;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
-final class MelhorEnvioClient
+final class MelhorEnvioClient implements ShippingQuoteGateway
 {
     public function verifyCredentials(): void
     {
@@ -42,8 +44,8 @@ final class MelhorEnvioClient
         }
     }
 
-    /** @return list<array<string, int|string>> */
-    public function quote(string $destinationZip, CartView $cart): array
+    /** @return list<ShippingOption> */
+    public function quote(ShippingQuoteRequest $request): array
     {
         $settings = DB::table('shipping_settings')->where('id', 1)->first();
 
@@ -73,13 +75,13 @@ final class MelhorEnvioClient
             ->timeout(20)
             ->post($endpoint, [
                 'from' => ['postal_code' => $originZip],
-                'to' => ['postal_code' => $this->onlyDigits($destinationZip)],
-                'products' => $this->productsPayload($cart),
+                'to' => ['postal_code' => $this->onlyDigits($request->postalCode)],
+                'products' => $this->productsPayload($request),
                 'services' => '',
                 'options' => [
                     'receipt' => false,
                     'own_hand' => false,
-                    'insurance_value' => $this->decimal($cart->subtotalAmount),
+                    'insurance_value' => $this->decimal(array_sum(array_map(fn (array $item): int => $item['unitPriceAmount'] * $item['quantity'], $request->items))),
                 ],
             ]);
 
@@ -88,7 +90,7 @@ final class MelhorEnvioClient
                 'status' => $response->status(),
                 'environment' => (string) $settings->environment,
                 'origin_zip' => $originZip,
-                'destination_zip' => $this->onlyDigits($destinationZip),
+                'destination_zip' => $this->onlyDigits($request->postalCode),
                 'body' => $response->json() ?? $response->body(),
             ]);
 
@@ -101,15 +103,17 @@ final class MelhorEnvioClient
             if (! is_array($row) || isset($row['error']) || ! isset($row['price'])) {
                 continue;
             }
-            $quote = [
-                'serviceId' => (string) ($row['id'] ?? $row['name'] ?? ''),
-                'name' => (string) ($row['name'] ?? 'Frete'),
-                'companyName' => (string) data_get($row, 'company.name', 'Transportadora'),
-                'priceAmount' => $this->moneyToCents((string) ($row['custom_price'] ?? $row['price'])),
-                'deliveryTime' => (int) ($row['custom_delivery_time'] ?? $row['delivery_time'] ?? 0),
-            ];
-            if ($quote['serviceId'] !== '' && $quote['priceAmount'] > 0) {
-                $quotes[] = $quote;
+            $serviceCode = (string) ($row['id'] ?? $row['name'] ?? '');
+            $priceAmount = $this->moneyToCents((string) ($row['custom_price'] ?? $row['price']));
+            if ($serviceCode !== '' && $priceAmount > 0) {
+                $quotes[] = new ShippingOption(
+                    $serviceCode,
+                    (string) ($row['name'] ?? 'Frete'),
+                    (string) data_get($row, 'company.name', 'Transportadora'),
+                    $priceAmount,
+                    'BRL',
+                    (int) ($row['custom_delivery_time'] ?? $row['delivery_time'] ?? 0),
+                );
             }
         }
 
@@ -117,7 +121,7 @@ final class MelhorEnvioClient
             Log::warning('Melhor Envio quote returned no available services', [
                 'environment' => (string) $settings->environment,
                 'origin_zip' => $originZip,
-                'destination_zip' => $this->onlyDigits($destinationZip),
+                'destination_zip' => $this->onlyDigits($request->postalCode),
                 'body' => $response->json(),
             ]);
 
@@ -128,17 +132,17 @@ final class MelhorEnvioClient
     }
 
     /** @return list<array<string, int|float|string>> */
-    private function productsPayload(CartView $cart): array
+    private function productsPayload(ShippingQuoteRequest $request): array
     {
         return array_map(fn (array $item): array => [
             'id' => (string) $item['cartItemKey'],
-            'width' => 20,
-            'height' => 5,
-            'length' => 30,
-            'weight' => 0.3,
+            'width' => $item['widthInCentimeters'],
+            'height' => $item['heightInCentimeters'],
+            'length' => $item['lengthInCentimeters'],
+            'weight' => round($item['weightInGrams'] / 1000, 3),
             'insurance_value' => $this->decimal((int) $item['unitPriceAmount']),
             'quantity' => (int) $item['quantity'],
-        ], $cart->items);
+        ], $request->items);
     }
 
     private function moneyToCents(string $value): int

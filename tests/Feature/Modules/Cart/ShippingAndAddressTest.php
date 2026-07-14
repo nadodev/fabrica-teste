@@ -1,22 +1,27 @@
 <?php
 
 use App\Models\User;
-use App\Modules\Cart\Application\DTO\CartView;
+use App\Modules\Shipping\Application\DTO\ShippingQuoteRequest;
 use App\Support\MelhorEnvioClient;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
 use Inertia\Testing\AssertableInertia as Assert;
 
-function shippingCartView(): CartView
+function shippingQuoteRequest(): ShippingQuoteRequest
 {
-    return new CartView([
+    return new ShippingQuoteRequest('01001000', [
         [
+            'productId' => 'product-shipping-1',
             'cartItemKey' => 'item-shipping-1',
             'unitPriceAmount' => 5000,
             'quantity' => 2,
+            'weightInGrams' => 850,
+            'widthInCentimeters' => 24,
+            'heightInCentimeters' => 8,
+            'lengthInCentimeters' => 35,
         ],
-    ], 10000, 0, 0, 10000, 'BRL');
+    ]);
 }
 
 it('uses the official production endpoint and authenticated Melhor Envio headers', function () {
@@ -37,13 +42,17 @@ it('uses the official production endpoint and authenticated Melhor Envio headers
         ]]),
     ]);
 
-    $quotes = app(MelhorEnvioClient::class)->quote('01001-000', shippingCartView());
+    $quotes = app(MelhorEnvioClient::class)->quote(shippingQuoteRequest());
 
     expect($quotes)->toHaveCount(1)
-        ->and($quotes[0]['priceAmount'])->toBe(2590);
+        ->and($quotes[0]->priceAmount)->toBe(2590);
     Http::assertSent(fn ($request): bool => $request->url() === 'https://melhorenvio.com.br/api/v2/me/shipment/calculate'
         && $request->hasHeader('Authorization', 'Bearer production-token')
-        && $request->hasHeader('User-Agent'));
+        && $request->hasHeader('User-Agent')
+        && $request['products'][0]['weight'] === 0.85
+        && $request['products'][0]['width'] === 24
+        && $request['products'][0]['height'] === 8
+        && $request['products'][0]['length'] === 35);
 });
 
 it('returns an actionable message when Melhor Envio refuses the token', function () {
@@ -57,7 +66,7 @@ it('returns an actionable message when Melhor Envio refuses the token', function
         'https://melhorenvio.com.br/api/v2/me/shipment/calculate' => Http::response(['message' => 'Unauthenticated.'], 401),
     ]);
 
-    app(MelhorEnvioClient::class)->quote('01001000', shippingCartView());
+    app(MelhorEnvioClient::class)->quote(shippingQuoteRequest());
 })->throws(RuntimeException::class, 'Integracoes > Permissoes de Acesso');
 
 it('looks up a postal address through the protected ViaCEP adapter', function () {
@@ -139,12 +148,12 @@ it('reports missing Melhor Envio settings separately', function () {
     ]);
     config()->set('services.melhor_envio.token', '');
 
-    expect(fn () => app(MelhorEnvioClient::class)->quote('01001000', shippingCartView()))
+    expect(fn () => app(MelhorEnvioClient::class)->quote(shippingQuoteRequest()))
         ->toThrow(RuntimeException::class, 'MELHOR_ENVIO_TOKEN nao foi carregado');
 
     config()->set('services.melhor_envio.token', 'environment-token');
 
-    expect(fn () => app(MelhorEnvioClient::class)->quote('01001000', shippingCartView()))
+    expect(fn () => app(MelhorEnvioClient::class)->quote(shippingQuoteRequest()))
         ->toThrow(RuntimeException::class, 'O CEP de origem nao esta salvo');
 });
 

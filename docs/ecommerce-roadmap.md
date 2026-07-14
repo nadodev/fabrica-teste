@@ -2,23 +2,23 @@
 
 ## Estado de prontidão
 
-| Capacidade | Estado | Necessário para MVP |
-| --- | --- | --- |
-| Arquitetura modular | Implementada | Sim |
-| Catálogo público | Parcial | Sim |
-| Idempotência | Fundação implementada | Sim |
-| Estoque e reservas | Fundação implementada | Sim |
-| Carrinho persistido | Não implementado | Sim |
-| Checkout | Não implementado | Sim |
-| Pedidos | Não implementado | Sim |
-| Pagamentos | Apenas porta | Sim |
-| Frete | Apenas porta | Sim |
-| Clientes e endereços | Não implementado | Sim |
-| Painel administrativo | CRUD seguro de produtos implementado | Sim |
-| Autenticação/autorização | Administração implementada | Sim |
-| Webhooks e reconciliação | Não implementado | Sim |
-| Observabilidade operacional | Não implementado | Sim |
-| LGPD e políticas comerciais | Não implementado | Sim |
+| Capacidade                  | Estado                                                              | Necessário para MVP |
+| --------------------------- | ------------------------------------------------------------------- | ------------------- |
+| Arquitetura modular         | Implementada                                                        | Sim                 |
+| Catálogo público            | Implementado; filtros avancados pendentes                           | Sim                 |
+| Idempotência                | Implementada nos comandos comerciais                                | Sim                 |
+| Estoque e reservas          | Implementados por SKU/variacao                                      | Sim                 |
+| Carrinho persistido         | Implementado                                                        | Sim                 |
+| Checkout                    | Implementado e transacional                                         | Sim                 |
+| Pedidos                     | Implementados com snapshots e estados protegidos                    | Sim                 |
+| Pagamentos                  | Gateway falso e Asaas real implementados                            | Sim                 |
+| Frete                       | Cotacao e revalidacao Melhor Envio implementadas; etiqueta pendente | Sim                 |
+| Clientes e endereços        | Implementados                                                       | Sim                 |
+| Painel administrativo       | Implementado; paginacao e RBAC pendentes                            | Sim                 |
+| Autenticação/autorização    | Login implementado; recuperacao e verificacao pendentes             | Sim                 |
+| Webhooks e reconciliação    | Implementados com retry e dead-letter                               | Sim                 |
+| Observabilidade operacional | Parcial                                                             | Sim                 |
+| LGPD e políticas comerciais | Politicas publicas parciais; ciclo do titular pendente              | Sim                 |
 
 ## Fase 1 — núcleo de venda
 
@@ -96,14 +96,12 @@
 
 ## Ordem de implementação recomendada
 
-1. Variantes de catálogo e saldo por SKU.
-2. Carrinho persistido server-side.
-3. Agregado Pedido e checkout transacional com outbox.
-4. Gateway falso e fluxo de pagamento completo.
-5. Primeiro adaptador real e webhooks.
-6. Frete e endereços.
-7. Área administrativa e operação.
-8. Observabilidade, carga, segurança e lançamento controlado.
+1. Etiqueta, expedicao e rastreamento.
+2. Detalhe do pedido e repeticao segura de pagamento.
+3. Recuperacao de senha, verificacao de e-mail e permissoes administrativas.
+4. Paginacao, cache e observabilidade.
+5. Backup/restauracao MySQL e alertas operacionais.
+6. LGPD, carga, concorrencia InnoDB e lancamento controlado.
 
 ## Definition of Done de uma capacidade comercial
 

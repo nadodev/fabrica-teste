@@ -47,7 +47,7 @@ final class AdminProductController extends Controller
             if ($handle === false) {
                 throw new RuntimeException('Export stream could not be opened.');
             }
-            fputcsv($handle, ['sku', 'name', 'description', 'category', 'price', 'stock', 'status']);
+            fputcsv($handle, ['sku', 'name', 'description', 'category', 'price', 'stock', 'weight_grams', 'width_cm', 'height_cm', 'length_cm', 'status']);
 
             $stockTotals = DB::table('inventory_stock_levels')
                 ->select('product_id')
@@ -67,6 +67,10 @@ final class AdminProductController extends Controller
                         $product->category,
                         number_format(((int) $product->price_amount) / 100, 2, '.', ''),
                         (int) ($product->on_hand ?? 0),
+                        (int) ($product->weight_grams ?? 300),
+                        (int) ($product->width_centimeters ?? 20),
+                        (int) ($product->height_centimeters ?? 5),
+                        (int) ($product->length_centimeters ?? 30),
                         $product->status,
                     ]);
                 });
@@ -112,6 +116,10 @@ final class AdminProductController extends Controller
                     'category' => mb_substr((string) ($data['category'] ?? 'Uniformes'), 0, 80),
                     'price_amount' => max(0, $price),
                     'price_currency' => 'BRL',
+                    'weight_grams' => max(1, min(30000, (int) ($data['weight_grams'] ?? 300))),
+                    'width_centimeters' => max(1, min(200, (int) ($data['width_cm'] ?? 20))),
+                    'height_centimeters' => max(1, min(200, (int) ($data['height_cm'] ?? 5))),
+                    'length_centimeters' => max(1, min(200, (int) ($data['length_cm'] ?? 30))),
                     'status' => in_array($data['status'] ?? 'draft', ['draft', 'active'], true) ? $data['status'] : 'draft',
                     'updated_at' => now(),
                     'created_at' => now(),
@@ -146,6 +154,10 @@ final class AdminProductController extends Controller
                 $this->galleryWithMainImage($imageUrl, $gallery),
                 $variations,
                 (int) ($data['stock'] ?? 100),
+                (int) ($data['weightGrams'] ?? 300),
+                (int) ($data['widthCentimeters'] ?? 20),
+                (int) ($data['heightCentimeters'] ?? 5),
+                (int) ($data['lengthCentimeters'] ?? 30),
             );
         } catch (Throwable $exception) {
             if ($storedPath !== null) {
@@ -189,6 +201,10 @@ final class AdminProductController extends Controller
                 $this->galleryWithMainImage($imageUrl, $gallery),
                 $variations,
                 (int) ($data['stock'] ?? $current->stockAvailable),
+                (int) ($data['weightGrams'] ?? $current->weightGrams),
+                (int) ($data['widthCentimeters'] ?? $current->widthCentimeters),
+                (int) ($data['heightCentimeters'] ?? $current->heightCentimeters),
+                (int) ($data['lengthCentimeters'] ?? $current->lengthCentimeters),
             );
         } catch (Throwable $exception) {
             if ($storedPath !== null) {

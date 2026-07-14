@@ -22,6 +22,10 @@ export type CatalogProduct = {
     stockAvailable: number;
     canSellWithoutStock: boolean;
     showStockAlerts: boolean;
+    weightGrams: number;
+    widthCentimeters: number;
+    heightCentimeters: number;
+    lengthCentimeters: number;
 };
 
 export const formatMoney = (amount: number, currency: string) =>

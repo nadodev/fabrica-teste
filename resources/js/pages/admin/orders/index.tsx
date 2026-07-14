@@ -21,6 +21,7 @@ type Order = {
     paymentMethod: string | null;
     paymentStatus: string | null;
     createdAt: string;
+    allowedStatuses: Record<string, string>;
 };
 
 export default function OrdersIndex({
@@ -146,16 +147,17 @@ export default function OrdersIndex({
                                                 }
                                                 className="rounded-md border border-border bg-white px-2 py-2 text-xs font-bold text-navy"
                                             >
-                                                {Object.entries(statuses).map(
-                                                    ([value, label]) => (
-                                                        <option
-                                                            key={value}
-                                                            value={value}
-                                                        >
-                                                            {label}
-                                                        </option>
-                                                    ),
-                                                )}
+                                                {Object.entries(
+                                                    order.allowedStatuses ??
+                                                        statuses,
+                                                ).map(([value, label]) => (
+                                                    <option
+                                                        key={value}
+                                                        value={value}
+                                                    >
+                                                        {label}
+                                                    </option>
+                                                ))}
                                             </select>
                                         </td>
                                         <td className="px-5 py-4 text-right">

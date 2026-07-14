@@ -47,12 +47,24 @@ type Order = {
     items: OrderItem[];
 };
 
+type StatusHistory = {
+    fromStatus: string;
+    toStatus: string;
+    adminName: string | null;
+    note: string | null;
+    createdAt: string;
+};
+
 export default function OrderShow({
     order,
     statuses = {},
+    allowedStatuses = {},
+    statusHistory = [],
 }: {
     order: Order;
     statuses?: Record<string, string>;
+    allowedStatuses?: Record<string, string>;
+    statusHistory?: StatusHistory[];
 }) {
     const items = Array.isArray(order.items) ? order.items : [];
     const updateStatus = (status: string) => {
@@ -102,16 +114,53 @@ export default function OrderShow({
                                 }
                                 className="rounded-md border border-border bg-white px-3 py-2 text-sm font-bold text-navy"
                             >
-                                {Object.entries(statuses).map(
-                                    ([value, label]) => (
-                                        <option key={value} value={value}>
-                                            {label}
-                                        </option>
-                                    ),
-                                )}
+                                {Object.entries(
+                                    Object.keys(allowedStatuses).length > 0
+                                        ? allowedStatuses
+                                        : statuses,
+                                ).map(([value, label]) => (
+                                    <option key={value} value={value}>
+                                        {label}
+                                    </option>
+                                ))}
                             </select>
                         </div>
                     </div>
+
+                    {statusHistory.length > 0 && (
+                        <div className="rounded-xl border border-border bg-white p-5">
+                            <h3 className="mb-4 font-display text-lg font-black text-navy">
+                                Historico do pedido
+                            </h3>
+                            <div className="space-y-3">
+                                {statusHistory.map((entry, index) => (
+                                    <div
+                                        key={`${entry.createdAt}-${index}`}
+                                        className="rounded-lg bg-bg-soft px-4 py-3 text-sm"
+                                    >
+                                        <div className="font-bold text-navy">
+                                            {statuses[entry.fromStatus] ??
+                                                entry.fromStatus}{' '}
+                                            →{' '}
+                                            {statuses[entry.toStatus] ??
+                                                entry.toStatus}
+                                        </div>
+                                        <div className="text-xs text-text-muted">
+                                            {entry.adminName ?? 'Sistema'} ·{' '}
+                                            {new Date(
+                                                entry.createdAt,
+                                            ).toLocaleString('pt-BR')}
+                                        </div>
+                                        {entry.note && (
+                                            <p className="mt-1 text-text-muted">
+                                                {entry.note}
+                                            </p>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
 
                     <div className="rounded-xl border border-border bg-white p-5">
                         <h3 className="mb-4 font-display text-lg font-black text-navy">

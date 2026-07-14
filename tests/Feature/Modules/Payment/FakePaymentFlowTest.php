@@ -16,6 +16,7 @@ use App\Modules\Payment\Application\DTO\CreditCardData;
 use App\Modules\Payment\Application\Exception\PaymentCardDeclined;
 use App\Modules\Payment\Application\Exception\PaymentGatewayTimeout;
 use App\Modules\Payment\Application\Port\PaymentGateway;
+use App\Modules\Payment\Application\Port\PaymentWebhookInbox;
 use App\Modules\Payment\Application\Query\ShowCheckoutSuccess;
 use App\Modules\Shared\Domain\ValueObject\Money;
 use Illuminate\Support\Facades\DB;
@@ -335,4 +336,24 @@ it('reconciles a missed Asaas partial refund and is inert while live access is d
 
     expect(app(ReconcileAsaasPayments::class)->handle())->toBe(1);
     $this->assertDatabaseHas('payment_payments', ['order_id' => $order->id, 'status' => 'partially_refunded', 'refunded_amount' => 1500]);
+});
+
+it('recovers interrupted webhook processing and dead letters exhausted events', function () {
+    $now = now()->subHour();
+    DB::table('payment_webhook_events')->insert([
+        [
+            'id' => 'evt_stale_retry', 'event' => 'PAYMENT_RECEIVED', 'provider_payment_id' => 'pay_stale_retry',
+            'payload' => '{}', 'status' => 'processing', 'attempts' => 2, 'available_at' => $now,
+            'created_at' => $now, 'updated_at' => $now,
+        ],
+        [
+            'id' => 'evt_stale_failed', 'event' => 'PAYMENT_RECEIVED', 'provider_payment_id' => 'pay_stale_failed',
+            'payload' => '{}', 'status' => 'processing', 'attempts' => 10, 'available_at' => $now,
+            'created_at' => $now, 'updated_at' => $now,
+        ],
+    ]);
+
+    expect(app(PaymentWebhookInbox::class)->recoverStale(15, 10))->toBe(2);
+    $this->assertDatabaseHas('payment_webhook_events', ['id' => 'evt_stale_retry', 'status' => 'pending', 'attempts' => 2]);
+    $this->assertDatabaseHas('payment_webhook_events', ['id' => 'evt_stale_failed', 'status' => 'failed', 'attempts' => 10]);
 });

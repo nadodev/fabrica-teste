@@ -33,6 +33,10 @@ final readonly class ProcessAsaasWebhooks
 
     public function handle(int $limit = 100): int
     {
+        $this->inbox->recoverStale(
+            (int) config('payment.asaas.webhook_stale_minutes', 15),
+            (int) config('payment.asaas.webhook_max_attempts', 10),
+        );
         $processed = 0;
         for ($handled = 0; $handled < max(1, min($limit, 1000)); $handled++) {
             $event = $this->inbox->claim();
@@ -62,7 +66,7 @@ final readonly class ProcessAsaasWebhooks
 
             return true;
         } catch (Throwable $exception) {
-            $this->inbox->retry($event->id, $exception->getMessage());
+            $this->inbox->retry($event->id, $exception->getMessage(), (int) config('payment.asaas.webhook_max_attempts', 10));
 
             return false;
         }
@@ -101,7 +105,7 @@ final readonly class ProcessAsaasWebhooks
                 }
                 $order = $this->orders->find($locked->orderId) ?? throw new RuntimeException('Order not found.');
                 $locked->refund();
-                if ($order->status() === OrderStatus::Paid) {
+                if (in_array($order->status(), [OrderStatus::Paid, OrderStatus::Processing, OrderStatus::Shipped, OrderStatus::Delivered], true)) {
                     $order->markRefunded();
                 }
                 $this->payments->save($locked, 'asaas_webhook');

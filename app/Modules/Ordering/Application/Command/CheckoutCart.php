@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Modules\Ordering\Application\Command;
 
+use App\Modules\Cart\Application\DTO\CartView;
+use App\Modules\Cart\Domain\CartItem;
 use App\Modules\Cart\Domain\Port\CartRepository;
 use App\Modules\Catalog\Domain\Port\ProductRepository;
 use App\Modules\Catalog\Domain\ProductStatus;
@@ -19,6 +21,7 @@ use App\Modules\Payment\Application\Command\CreatePaymentIntent;
 use App\Modules\Shared\Application\Port\OutboxStore;
 use App\Modules\Shared\Application\Port\TransactionManager;
 use App\Modules\Shared\Domain\ValueObject\Money;
+use App\Modules\Shipping\Application\Query\QuoteCartShipping;
 use App\Modules\Shipping\Application\Query\ResolveFreeShipping;
 use App\Support\StoreSettings;
 use DomainException;
@@ -37,17 +40,40 @@ final readonly class CheckoutCart
         private StoreSettings $settings,
         private CreatePaymentIntent $createPayment,
         private ResolveFreeShipping $freeShipping,
+        private QuoteCartShipping $quoteShipping,
     ) {}
 
     public function handle(string $orderId, string $plainCartToken, CheckoutData $data): Order
     {
-        return $this->transactions->run(function () use ($orderId, $plainCartToken, $data): Order {
+        $preflightCart = $this->carts->findByTokenHash(hash('sha256', $plainCartToken), false)
+            ?? throw new DomainException('Active cart not found.');
+        $existing = $this->orders->findByCartId($preflightCart->id);
+        if ($existing !== null) {
+            return $existing;
+        }
+
+        $selectedService = trim((string) ($data->shippingQuote['serviceId'] ?? ''));
+        $verifiedQuote = in_array($selectedService, ['', 'free-shipping'], true) ? null : $data->shippingQuote;
+        if ($selectedService !== '' && $selectedService !== 'free-shipping') {
+            $verifiedQuote = $this->quoteShipping->revalidate(
+                $data->shippingZip,
+                CartView::fromDomain($preflightCart),
+                $selectedService,
+            );
+        }
+        $preflightFingerprint = $this->cartFingerprint($preflightCart->items());
+
+        return $this->transactions->run(function () use ($orderId, $plainCartToken, $data, $verifiedQuote, $preflightFingerprint): Order {
             $cart = $this->carts->findByTokenHash(hash('sha256', $plainCartToken), false)
                 ?? throw new DomainException('Active cart not found.');
             $existing = $this->orders->findByCartId($cart->id);
 
             if ($existing !== null) {
                 return $existing;
+            }
+
+            if ($this->cartFingerprint($cart->items()) !== $preflightFingerprint) {
+                throw new DomainException('O carrinho mudou depois do calculo do frete. Calcule o frete novamente.');
             }
 
             if ($cart->total()->amount < $this->settings->minimumOrderAmount()) {
@@ -70,7 +96,7 @@ final readonly class CheckoutCart
 
             $eligibleAmount = max(0, $cart->total()->amount - ($discount === null ? 0 : $discount->amount));
             $quote = $this->freeShipping->handle($eligibleAmount)
-                ?? $data->shippingQuote
+                ?? $verifiedQuote
                 ?? throw new DomainException('Calcule e selecione uma opcao de frete antes de finalizar.');
             $shippingService = trim((string) ($quote['name'] ?? ''));
             $shippingCompany = trim((string) ($quote['companyName'] ?? '')) ?: null;
@@ -158,5 +184,19 @@ final readonly class CheckoutCart
 
             return $order;
         });
+    }
+
+    /** @param list<CartItem> $items */
+    private function cartFingerprint(array $items): string
+    {
+        return hash('sha256', json_encode(array_map(fn (CartItem $item): array => [
+            $item->productId,
+            $item->cartItemKey,
+            $item->sku,
+            $item->variationKey,
+            $item->unitPrice->amount,
+            $item->unitPrice->currency,
+            $item->quantity,
+        ], $items), JSON_THROW_ON_ERROR));
     }
 }

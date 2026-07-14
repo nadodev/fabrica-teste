@@ -20,6 +20,10 @@ type ProductFormData = {
     category: string;
     price: string;
     stock: string;
+    weightGrams: string;
+    widthCentimeters: string;
+    heightCentimeters: string;
+    lengthCentimeters: string;
     status: string;
     imageUrl: string;
     existingGalleryImages: string[];
@@ -55,6 +59,10 @@ export function AdminProductForm({
             ? (product.priceAmount / 100).toFixed(2).replace('.', ',')
             : '',
         stock: String(product?.stockAvailable ?? 0),
+        weightGrams: String(product?.weightGrams ?? 300),
+        widthCentimeters: String(product?.widthCentimeters ?? 20),
+        heightCentimeters: String(product?.heightCentimeters ?? 5),
+        lengthCentimeters: String(product?.lengthCentimeters ?? 30),
         status: product?.status === 'active' ? 'active' : 'draft',
         imageUrl: product?.imageUrl?.startsWith('http') ? product.imageUrl : '',
         existingGalleryImages:
@@ -145,6 +153,90 @@ export function AdminProductForm({
                     />
                 </Field>
             </div>
+
+            <section className="rounded-xl border border-border bg-bg-soft p-4">
+                <div className="mb-4">
+                    <h3 className="font-display text-lg font-black text-navy">
+                        Peso e dimensoes para o frete
+                    </h3>
+                    <p className="text-xs text-text-muted">
+                        Informe as medidas do produto embalado. Estes dados sao
+                        enviados ao Melhor Envio no calculo e na confirmacao do
+                        pedido.
+                    </p>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <Field
+                        label="Peso (gramas)"
+                        error={form.errors.weightGrams}
+                    >
+                        <input
+                            type="number"
+                            min={1}
+                            max={30000}
+                            value={form.data.weightGrams}
+                            onChange={(event) =>
+                                form.setData('weightGrams', event.target.value)
+                            }
+                            className="input"
+                        />
+                    </Field>
+                    <Field
+                        label="Largura (cm)"
+                        error={form.errors.widthCentimeters}
+                    >
+                        <input
+                            type="number"
+                            min={1}
+                            max={200}
+                            value={form.data.widthCentimeters}
+                            onChange={(event) =>
+                                form.setData(
+                                    'widthCentimeters',
+                                    event.target.value,
+                                )
+                            }
+                            className="input"
+                        />
+                    </Field>
+                    <Field
+                        label="Altura (cm)"
+                        error={form.errors.heightCentimeters}
+                    >
+                        <input
+                            type="number"
+                            min={1}
+                            max={200}
+                            value={form.data.heightCentimeters}
+                            onChange={(event) =>
+                                form.setData(
+                                    'heightCentimeters',
+                                    event.target.value,
+                                )
+                            }
+                            className="input"
+                        />
+                    </Field>
+                    <Field
+                        label="Comprimento (cm)"
+                        error={form.errors.lengthCentimeters}
+                    >
+                        <input
+                            type="number"
+                            min={1}
+                            max={200}
+                            value={form.data.lengthCentimeters}
+                            onChange={(event) =>
+                                form.setData(
+                                    'lengthCentimeters',
+                                    event.target.value,
+                                )
+                            }
+                            className="input"
+                        />
+                    </Field>
+                </div>
+            </section>
 
             <Field label="Descricao" error={form.errors.description}>
                 <textarea
