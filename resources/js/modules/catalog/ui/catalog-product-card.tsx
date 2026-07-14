@@ -99,7 +99,7 @@ export function CatalogProductCard({
                     {hasVariations ? (
                         <Link
                             href={`/produtos/${product.id}`}
-                            className="mt-2 inline-flex items-center justify-center gap-2 rounded-md bg-yellow px-3 py-2 text-xs font-black text-navy"
+                            className="inline-flex items-center justify-center gap-2 rounded-md bg-yellow px-3 py-2 text-xs font-black text-navy"
                         >
                             <ShoppingCart className="h-3.5 w-3.5" /> Escolher
                             variacao
@@ -109,7 +109,7 @@ export function CatalogProductCard({
                             type="button"
                             disabled={!canQuickAdd || adding}
                             onClick={addToCart}
-                            className="mt-2 inline-flex items-center justify-center gap-2 rounded-md bg-yellow px-3 py-2 text-xs font-black text-navy disabled:cursor-not-allowed disabled:opacity-60"
+                            className="inline-flex items-center justify-center gap-2 rounded-md bg-yellow px-3 py-2 text-xs font-black text-navy disabled:cursor-not-allowed disabled:opacity-60"
                         >
                             <ShoppingCart className="h-3.5 w-3.5" />{' '}
                             {adding ? 'Adicionando...' : 'Comprar'}
