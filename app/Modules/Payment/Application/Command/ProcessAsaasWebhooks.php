@@ -39,16 +39,33 @@ final readonly class ProcessAsaasWebhooks
             if ($event === null) {
                 break;
             }
-            try {
-                $this->apply($event);
-                $this->inbox->processed($event->id);
+            if ($this->process($event)) {
                 $processed++;
-            } catch (Throwable $exception) {
-                $this->inbox->retry($event->id, $exception->getMessage());
             }
         }
 
         return $processed;
+    }
+
+    public function handleEvent(string $id): bool
+    {
+        $event = $this->inbox->claim($id);
+
+        return $event !== null && $this->process($event);
+    }
+
+    private function process(ProviderWebhookEvent $event): bool
+    {
+        try {
+            $this->apply($event);
+            $this->inbox->processed($event->id);
+
+            return true;
+        } catch (Throwable $exception) {
+            $this->inbox->retry($event->id, $exception->getMessage());
+
+            return false;
+        }
     }
 
     private function apply(ProviderWebhookEvent $event): void

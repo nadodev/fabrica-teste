@@ -27,10 +27,18 @@ final readonly class DatabasePaymentWebhookInbox implements PaymentWebhookInbox
         ]);
     }
 
-    public function claim(): ?ProviderWebhookEvent
+    public function claim(?string $id = null): ?ProviderWebhookEvent
     {
-        return $this->database->transaction(function (): ?ProviderWebhookEvent {
-            $record = $this->database->table('payment_webhook_events')->where('status', 'pending')->where('available_at', '<=', now())->orderBy('created_at')->lockForUpdate()->first();
+        return $this->database->transaction(function () use ($id): ?ProviderWebhookEvent {
+            $query = $this->database->table('payment_webhook_events')
+                ->where('status', 'pending')
+                ->where('available_at', '<=', now());
+            if ($id !== null) {
+                $query->where('id', $id);
+            } else {
+                $query->orderBy('created_at');
+            }
+            $record = $query->lockForUpdate()->first();
             if ($record === null) {
                 return null;
             }

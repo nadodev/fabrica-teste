@@ -1,5 +1,6 @@
-import { createInertiaApp } from '@inertiajs/react';
-import type { ComponentType, CSSProperties } from 'react';
+import { createInertiaApp, router } from '@inertiajs/react';
+import type { ComponentType, CSSProperties, ReactNode } from 'react';
+import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { CookieNotice } from '@/components/cookie-notice';
 import { FlashToast } from '@/components/flash-toast';
@@ -78,6 +79,15 @@ type CatalogCategory = {
     imageUrl: string | null;
 };
 
+type SharedPageProps = {
+    siteSettings?: SiteSettings;
+    cartSummary?: CartSummary;
+    topbarNotification?: TopbarNotification | null;
+    catalogCategories?: CatalogCategory[];
+    auth?: { user?: AuthUser | null };
+    flash?: Flash | null;
+};
+
 function shadeHex(hex: string, percent: number) {
     const clean = /^#[0-9a-fA-F]{6}$/.test(hex) ? hex.slice(1) : '123a6b';
     const num = Number.parseInt(clean, 16);
@@ -100,67 +110,87 @@ createInertiaApp({
         return pages[`./pages/${name}.tsx`];
     },
     setup({ el, App, props }) {
-        const isBackOffice =
-            props.initialPage.component.startsWith('admin/') ||
-            props.initialPage.component.startsWith('auth/');
-        const settings =
+        const initialSettings =
             (props.initialPage.props.siteSettings as
                 SiteSettings | undefined) ?? defaultSiteSettings;
-        runtimeAppName = settings.seo?.title || settings.storeName || appName;
-        const cartSummary = props.initialPage.props.cartSummary as
-            CartSummary | undefined;
-        const topbarNotification = props.initialPage.props
-            .topbarNotification as TopbarNotification | null | undefined;
-        const catalogCategories = props.initialPage.props.catalogCategories as
-            CatalogCategory[] | undefined;
-        const auth = props.initialPage.props.auth as
-            { user?: AuthUser | null } | undefined;
-        const flash = props.initialPage.props.flash as Flash | null | undefined;
-        const primary = settings?.primaryColor ?? '#123a6b';
-        const secondary = settings?.secondaryColor ?? '#f5c542';
-        const themeStyle = {
-            '--navy': primary,
-            '--navy-deep': shadeHex(primary, -18),
-            '--yellow': secondary,
-            '--yellow-soft': shadeHex(secondary, 35),
-            '--ring': primary,
-        } as CSSProperties;
-        applyRuntimeSettings(settings);
+        runtimeAppName =
+            initialSettings.seo?.title || initialSettings.storeName || appName;
+        applyRuntimeSettings(initialSettings);
 
         createRoot(el).render(
-            <div
-                className="flex min-h-screen flex-col bg-white"
-                style={themeStyle}
+            <SiteShell
+                initialComponent={props.initialPage.component}
+                initialProps={props.initialPage.props as SharedPageProps}
             >
-                {!isBackOffice && (
-                    <SiteHeader
-                        settings={settings}
-                        initialCartItemsCount={cartSummary?.itemsCount ?? 0}
-                        notification={topbarNotification ?? null}
-                        user={auth?.user ?? null}
-                        categories={catalogCategories ?? []}
-                    />
-                )}
-                <main className="flex-1">
-                    <App {...props} />
-                </main>
-                {!isBackOffice && <SiteFooter settings={settings} />}
-                {!isBackOffice && (
-                    <CookieNotice
-                        enabled={settings.policies?.cookieNotice !== false}
-                        privacyUrl={
-                            settings.policies?.privacyUrl || '/privacidade'
-                        }
-                    />
-                )}
-                <FlashToast initialFlash={flash ?? null} />
-            </div>,
+                <App {...props} />
+            </SiteShell>,
         );
     },
     progress: {
         color: '#f5c542',
     },
 });
+
+function SiteShell({
+    initialComponent,
+    initialProps,
+    children,
+}: {
+    initialComponent: string;
+    initialProps: SharedPageProps;
+    children: ReactNode;
+}) {
+    const [component, setComponent] = useState(initialComponent);
+    const [shared, setShared] = useState(initialProps);
+
+    useEffect(() => {
+        return router.on('success', (event) => {
+            setComponent(event.detail.page.component);
+            setShared(event.detail.page.props as SharedPageProps);
+        });
+    }, []);
+
+    const isBackOffice =
+        component.startsWith('admin/') || component.startsWith('auth/');
+    const settings = shared.siteSettings ?? defaultSiteSettings;
+    const primary = settings.primaryColor ?? '#123a6b';
+    const secondary = settings.secondaryColor ?? '#f5c542';
+    const themeStyle = {
+        '--navy': primary,
+        '--navy-deep': shadeHex(primary, -18),
+        '--yellow': secondary,
+        '--yellow-soft': shadeHex(secondary, 35),
+        '--ring': primary,
+    } as CSSProperties;
+
+    useEffect(() => {
+        runtimeAppName = settings.seo?.title || settings.storeName || appName;
+        applyRuntimeSettings(settings);
+    }, [settings]);
+
+    return (
+        <div className="flex min-h-screen flex-col bg-white" style={themeStyle}>
+            {!isBackOffice && (
+                <SiteHeader
+                    settings={settings}
+                    initialCartItemsCount={shared.cartSummary?.itemsCount ?? 0}
+                    notification={shared.topbarNotification ?? null}
+                    user={shared.auth?.user ?? null}
+                    categories={shared.catalogCategories ?? []}
+                />
+            )}
+            <main className="flex-1">{children}</main>
+            {!isBackOffice && <SiteFooter settings={settings} />}
+            {!isBackOffice && (
+                <CookieNotice
+                    enabled={settings.policies?.cookieNotice !== false}
+                    privacyUrl={settings.policies?.privacyUrl || '/privacidade'}
+                />
+            )}
+            <FlashToast initialFlash={shared.flash ?? null} />
+        </div>
+    );
+}
 
 function applyRuntimeSettings(settings: SiteSettings) {
     if (settings.faviconUrl) {

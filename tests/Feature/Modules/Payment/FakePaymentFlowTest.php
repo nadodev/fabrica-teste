@@ -218,7 +218,7 @@ it('authenticates, deduplicates and processes an Asaas payment webhook', functio
     $this->postJson('/webhooks/asaas', $payload, $headers)->assertOk();
 
     expect(DB::table('payment_webhook_events')->count())->toBe(1)
-        ->and(app(ProcessAsaasWebhooks::class)->handle())->toBe(1);
+        ->and(app(ProcessAsaasWebhooks::class)->handle())->toBe(0);
     $this->assertDatabaseHas('payment_payments', ['order_id' => $order->id, 'status' => 'paid']);
     $this->assertDatabaseHas('ordering_orders', ['id' => $order->id, 'status' => 'paid', 'payment_status' => 'paid']);
     $this->assertDatabaseHas('inventory_stock_levels', ['product_id' => $productId, 'on_hand' => 1, 'reserved' => 0]);
@@ -236,14 +236,12 @@ it('reflects partial refunds and chargebacks received from Asaas', function () {
         'event' => 'PAYMENT_RECEIVED',
         'payment' => ['id' => 'pay_webhook_state', 'status' => 'RECEIVED', 'billingType' => 'PIX', 'value' => 100],
     ], $headers)->assertOk();
-    expect(app(ProcessAsaasWebhooks::class)->handle())->toBe(1);
 
     $this->postJson('/webhooks/asaas', [
         'id' => 'evt_state_partial',
         'event' => 'PAYMENT_PARTIALLY_REFUNDED',
         'payment' => ['id' => 'pay_webhook_state', 'status' => 'RECEIVED', 'billingType' => 'PIX', 'refundedValue' => 25],
     ], $headers)->assertOk();
-    expect(app(ProcessAsaasWebhooks::class)->handle())->toBe(1);
     $this->assertDatabaseHas('payment_payments', ['order_id' => $order->id, 'status' => 'partially_refunded', 'refunded_amount' => 2500]);
     $this->assertDatabaseHas('ordering_orders', ['id' => $order->id, 'status' => 'paid', 'payment_status' => 'partially_refunded']);
 
@@ -256,9 +254,60 @@ it('reflects partial refunds and chargebacks received from Asaas', function () {
             'chargeback' => ['status' => 'REQUESTED', 'reason' => 'FRAUD'],
         ],
     ], $headers)->assertOk();
-    expect(app(ProcessAsaasWebhooks::class)->handle())->toBe(1);
     $this->assertDatabaseHas('payment_payments', ['order_id' => $order->id, 'status' => 'chargeback', 'failure_code' => 'requested']);
     $this->assertDatabaseHas('ordering_orders', ['id' => $order->id, 'status' => 'paid', 'payment_status' => 'chargeback']);
+});
+
+it('immediately reflects a full Asaas refund and keeps duplicate delivery idempotent', function () {
+    config()->set('payment.asaas.webhook_token', str_repeat('w', 40));
+    [$order] = checkoutForFakePayment();
+    DB::table('payment_payments')->where('order_id', $order->id)->update(['provider' => 'asaas', 'provider_payment_id' => 'pay_webhook_refund']);
+    $headers = ['asaas-access-token' => str_repeat('w', 40)];
+
+    $this->postJson('/webhooks/asaas', [
+        'id' => 'evt_refund_paid',
+        'event' => 'PAYMENT_CONFIRMED',
+        'payment' => ['id' => 'pay_webhook_refund', 'status' => 'CONFIRMED', 'billingType' => 'CREDIT_CARD', 'value' => 100],
+    ], $headers)->assertOk();
+
+    $refund = [
+        'id' => 'evt_refund_done',
+        'event' => 'PAYMENT_REFUNDED',
+        'payment' => ['id' => 'pay_webhook_refund', 'status' => 'REFUNDED', 'billingType' => 'CREDIT_CARD', 'value' => 100, 'refundedValue' => 100],
+    ];
+    $this->postJson('/webhooks/asaas', $refund, $headers)->assertOk();
+    $this->postJson('/webhooks/asaas', $refund, $headers)->assertOk();
+
+    $this->assertDatabaseHas('payment_payments', [
+        'order_id' => $order->id,
+        'status' => 'refunded',
+        'refunded_amount' => 10000,
+    ]);
+    $this->assertDatabaseHas('ordering_orders', [
+        'id' => $order->id,
+        'status' => 'refunded',
+        'payment_status' => 'refunded',
+    ]);
+    $this->assertDatabaseHas('payment_webhook_events', ['id' => 'evt_refund_done', 'status' => 'processed', 'attempts' => 1]);
+    expect(DB::table('payment_status_history')->where('payment_id', DB::table('payment_payments')->where('order_id', $order->id)->value('id'))->where('to_status', 'refunded')->count())->toBe(1);
+});
+
+it('keeps an immediately unprocessable Asaas event available for scheduled retry', function () {
+    config()->set('payment.asaas.webhook_token', str_repeat('w', 40));
+
+    $this->postJson('/webhooks/asaas', [
+        'id' => 'evt_retry_missing_payment',
+        'event' => 'PAYMENT_REFUNDED',
+        'payment' => ['id' => 'pay_missing', 'status' => 'REFUNDED', 'billingType' => 'CREDIT_CARD', 'value' => 100],
+    ], ['asaas-access-token' => str_repeat('w', 40)])->assertOk();
+
+    $this->assertDatabaseHas('payment_webhook_events', [
+        'id' => 'evt_retry_missing_payment',
+        'status' => 'pending',
+        'attempts' => 1,
+    ]);
+    expect(DB::table('payment_webhook_events')->where('id', 'evt_retry_missing_payment')->value('last_error'))
+        ->toBe('Payment for Asaas event was not found.');
 });
 
 it('reconciles a missed Asaas partial refund and is inert while live access is disabled', function () {

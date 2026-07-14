@@ -6,7 +6,7 @@ Criar e acompanhar cobrancas Asaas sem marcar um pedido como pago antes da confi
 
 ## Escopo
 
-Clientes, PIX com QR Code e copia e cola, boleto, cartao, estorno total e parcial, chargeback, webhook autenticado, inbox idempotente, processamento e reconciliacao agendados.
+Clientes, PIX com QR Code e copia e cola, boleto, cartao, estorno total e parcial, chargeback, webhook autenticado, inbox idempotente, processamento imediato com retry e reconciliacao agendada.
 
 ## Fora do escopo
 
@@ -19,6 +19,7 @@ Execucao automatica de uma cobranca real durante testes locais. A primeira valid
 - PIX confirma em `PAYMENT_RECEIVED`; cartao e boleto podem confirmar em `PAYMENT_CONFIRMED`.
 - Recusa, exclusao ou cancelamento de boleto liberam reserva e cancelam o pedido.
 - Evento duplicado nao repete transicao.
+- O evento autenticado e persistido antes de ser processado imediatamente; falha local mantem o evento pendente para retry.
 - Reserva vencida apos recebimento provoca estorno compensatorio.
 - Somente estornos com estado `DONE` entram no valor devolvido.
 - Estorno parcial e cumulativo e nunca pode reduzir o valor ja registrado.
@@ -35,7 +36,7 @@ Execucao automatica de uma cobranca real durante testes locais. A primeira valid
 
 ## Fluxo principal
 
-No checkout pago, `EnsurePaymentGatewayReady` valida a configuracao e, somente depois, o pedido e criado. A cobranca e criada imediatamente. PIX retorna QR Code e copia e cola. Cartao abre os campos somente quando selecionado e envia os dados transitorios diretamente ao Asaas junto com titular e IP. O outbox permanece como fallback, consulta por `externalReference` antes de criar e nao duplica uma cobranca ja vinculada. O endpoint `/webhooks/asaas` autentica, reduz e grava o evento; o scheduler aplica a transicao. A cada 15 minutos, pagamentos abertos sao consultados no Asaas e transformados nos mesmos eventos internos para recuperar webhooks perdidos.
+No checkout pago, `EnsurePaymentGatewayReady` valida a configuracao e, somente depois, o pedido e criado. A cobranca e criada imediatamente. PIX retorna QR Code e copia e cola. Cartao abre os campos somente quando selecionado e envia os dados transitorios diretamente ao Asaas junto com titular e IP. O outbox permanece como fallback, consulta por `externalReference` antes de criar e nao duplica uma cobranca ja vinculada. O endpoint `/webhooks/asaas` autentica, reduz, grava e tenta aplicar imediatamente o evento especifico. A cada minuto, o scheduler retenta eventos pendentes e, a cada 15 minutos, pagamentos abertos sao consultados no Asaas para recuperar webhooks perdidos.
 
 ## Fluxos alternativos
 
@@ -43,7 +44,7 @@ Recusa de cartao mantem o token de sessao, arquiva o carrinho convertido ligado 
 
 ## Casos de uso
 
-`EnsurePaymentGatewayReady`, `ProcessPayment`, `ReceiveAsaasWebhook`, `ProcessAsaasWebhooks` e `ReconcileAsaasPayments`. `ProcessPayment` recebe `CreditCardData` somente na chamada sincrona do checkout.
+`EnsurePaymentGatewayReady`, `ProcessPayment`, `ReceiveAsaasWebhook`, `ProcessAsaasWebhooks::handleEvent` e `ReconcileAsaasPayments`. `ProcessPayment` recebe `CreditCardData` somente na chamada sincrona do checkout.
 
 ## Arquitetura
 
@@ -63,7 +64,7 @@ Rede ocorre fora da transacao. Na recusa, pedido, pagamento, estoque, cupom e re
 
 ## Idempotencia
 
-Referencia externa do pedido, ID do evento, fingerprint da reconciliacao e transicoes monotonicamente crescentes impedem repeticoes ou regressao do valor estornado.
+Referencia externa do pedido, ID do evento, claim atomico, fingerprint da reconciliacao e transicoes monotonicamente crescentes impedem repeticoes ou regressao do valor estornado.
 
 ## Seguranca
 
@@ -83,7 +84,7 @@ Contrato HTTP simulado, trava de producao, token invalido, duplicacao, confirmac
 
 ## Casos de QA
 
-Consulte `docs/qa/2026-07-13-asaas-production-integration.md`.
+Consulte `docs/qa/2026-07-13-asaas-production-integration.md` e `docs/qa/2026-07-13-asaas-refund-synchronization.md`.
 
 ## Como validar
 
@@ -91,4 +92,4 @@ Publicar, configurar `PAYMENT_GATEWAY=asaas`, `ASAAS_BASE_URL=https://api.asaas.
 
 ## Riscos e limitacoes
 
-Sem sandbox, a validacao final movimentara dinheiro real. Pedidos antigos com falha antes do ID Asaas precisam de `payments:process` depois da correcao da configuracao. A reconciliacao e as novas tentativas dependem do scheduler ativo, e a validacao de concorrencia ainda precisa ocorrer em MySQL/InnoDB no ambiente publicado.
+Sem sandbox, a validacao final movimentara dinheiro real. Pedidos antigos com falha antes do ID Asaas precisam de `payments:process` depois da correcao da configuracao. Eventos aplicados imediatamente reduzem a dependencia operacional, mas retries e webhooks perdidos ainda dependem do scheduler ativo. A validacao de concorrencia ainda precisa ocorrer em MySQL/InnoDB no ambiente publicado.

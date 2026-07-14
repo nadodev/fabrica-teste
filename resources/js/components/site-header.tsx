@@ -1,6 +1,8 @@
 import { Link, router } from '@inertiajs/react';
 import {
     ChevronDown,
+    LayoutDashboard,
+    LogOut,
     Mail,
     MapPin,
     Menu,
@@ -38,6 +40,7 @@ type TopbarNotification = {
 type AuthUser = {
     name: string;
     email: string;
+    is_admin?: boolean;
 };
 
 type CatalogCategory = {
@@ -82,6 +85,8 @@ export function SiteHeader({
             term ? `/produtos?busca=${encodeURIComponent(term)}` : '/produtos',
         );
     };
+
+    const logout = () => router.post('/sair');
 
     useEffect(() => {
         return router.on('success', (event) => {
@@ -187,20 +192,47 @@ export function SiteHeader({
                                 <Mail className="mr-1.5 h-4 w-4" /> E-mail
                             </a>
                         )}
-                        <Link
-                            href={user ? '/minha-conta' : '/entrar'}
-                            className="hidden rounded-xl border border-border bg-bg-soft px-3 py-2 text-xs font-bold text-navy transition hover:border-navy md:inline-flex"
-                        >
-                            <User className="mr-1.5 h-4 w-4" />{' '}
-                            {user ? 'Minha conta' : 'Entrar'}
-                        </Link>
-                        {!user && (
-                            <Link
-                                href="/cadastro"
-                                className="hidden rounded-xl border border-border bg-white px-3 py-2 text-xs font-bold text-navy transition hover:border-navy lg:inline-flex"
-                            >
-                                Cadastrar
-                            </Link>
+                        {user ? (
+                            <>
+                                <Link
+                                    href="/minha-conta"
+                                    className="hidden rounded-xl border border-border bg-bg-soft px-3 py-2 text-xs font-bold text-navy transition hover:border-navy md:inline-flex"
+                                >
+                                    <User className="mr-1.5 h-4 w-4" /> Minha
+                                    conta
+                                </Link>
+                                {user.is_admin && (
+                                    <Link
+                                        href="/admin"
+                                        className="hidden rounded-xl bg-navy px-3 py-2 text-xs font-bold text-white transition hover:bg-navy-deep lg:inline-flex"
+                                    >
+                                        <LayoutDashboard className="mr-1.5 h-4 w-4" />{' '}
+                                        Painel admin
+                                    </Link>
+                                )}
+                                <button
+                                    type="button"
+                                    onClick={logout}
+                                    className="hidden rounded-xl border border-border bg-white px-3 py-2 text-xs font-bold text-navy transition hover:border-navy lg:inline-flex"
+                                >
+                                    <LogOut className="mr-1.5 h-4 w-4" /> Sair
+                                </button>
+                            </>
+                        ) : (
+                            <>
+                                <Link
+                                    href="/entrar"
+                                    className="hidden rounded-xl border border-border bg-bg-soft px-3 py-2 text-xs font-bold text-navy transition hover:border-navy md:inline-flex"
+                                >
+                                    <User className="mr-1.5 h-4 w-4" /> Entrar
+                                </Link>
+                                <Link
+                                    href="/cadastro"
+                                    className="hidden rounded-xl border border-border bg-white px-3 py-2 text-xs font-bold text-navy transition hover:border-navy lg:inline-flex"
+                                >
+                                    Cadastrar
+                                </Link>
+                            </>
                         )}
                         <Link
                             href="/carrinho"
@@ -321,6 +353,49 @@ export function SiteHeader({
                     >
                         Sobre nos
                     </a>
+
+                    <div className="flex shrink-0 items-center gap-2 md:hidden">
+                        {user ? (
+                            <>
+                                <Link
+                                    href="/minha-conta"
+                                    className="rounded-md px-3 py-2 text-xs font-bold transition hover:bg-white/10"
+                                >
+                                    Minha conta
+                                </Link>
+                                {user.is_admin && (
+                                    <Link
+                                        href="/admin"
+                                        className="rounded-md bg-yellow px-3 py-2 text-xs font-black text-navy"
+                                    >
+                                        Painel admin
+                                    </Link>
+                                )}
+                                <button
+                                    type="button"
+                                    onClick={logout}
+                                    className="rounded-md px-3 py-2 text-xs font-bold transition hover:bg-white/10"
+                                >
+                                    Sair
+                                </button>
+                            </>
+                        ) : (
+                            <>
+                                <Link
+                                    href="/entrar"
+                                    className="rounded-md px-3 py-2 text-xs font-bold transition hover:bg-white/10"
+                                >
+                                    Entrar
+                                </Link>
+                                <Link
+                                    href="/cadastro"
+                                    className="rounded-md px-3 py-2 text-xs font-bold transition hover:bg-white/10"
+                                >
+                                    Cadastrar
+                                </Link>
+                            </>
+                        )}
+                    </div>
 
                     <Link
                         href="/carrinho"

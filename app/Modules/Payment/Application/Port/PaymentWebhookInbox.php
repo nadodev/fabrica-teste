@@ -10,7 +10,7 @@ interface PaymentWebhookInbox
 {
     public function receive(ProviderWebhookEvent $event): void;
 
-    public function claim(): ?ProviderWebhookEvent;
+    public function claim(?string $id = null): ?ProviderWebhookEvent;
 
     public function processed(string $id): void;
 

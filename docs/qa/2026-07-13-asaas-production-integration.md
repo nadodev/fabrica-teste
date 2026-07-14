@@ -36,8 +36,8 @@ Local, SQLite, API real nao chamada.
 - ASAAS-11: mesmo ID de webhook duas vezes; uma linha e uma transicao; obtido conforme esperado; OK.
 - ASAAS-12: mesmo snapshot reconciliado novamente; fingerprint nao cria nova transicao; implementado; OK.
 ## Casos de regressao
-- ASAAS-13: testes focados de checkout e pagamentos; 27 testes e 176 assercoes aprovados.
-- ASAAS-14: suite completa; 72 testes e 452 assercoes aprovados.
+- ASAAS-13: testes focados do fluxo de pagamentos; 13 testes e 78 assercoes aprovados nesta rodada.
+- ASAAS-14: suite completa; 91 testes e 564 assercoes aprovados.
 ## Casos responsivos
 - ASAAS-15: campos do cartao usam uma coluna no celular e duas em telas maiores; revisao estrutural concluida; validacao visual publicada pendente.
 ## Casos de acessibilidade
