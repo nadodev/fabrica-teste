@@ -87,12 +87,12 @@ export function CatalogProductCard({
                 </div>
                 <div
                     className={
-                        variant === 'list' ? 'mt-3 flex flex-wrap gap-2' : 'flex gap-2 items-center'
+                        variant === 'list' ? 'flex flex-wrap gap-2' : 'flex gap-2 items-center'
                     }
                 >
                     <Link
                         href={`/produtos/${product.id}`}
-                        className="mt-3 inline-flex justify-center rounded-md bg-navy px-3 py-2 text-xs font-semibold text-white"
+                        className="inline-flex justify-center rounded-md bg-navy px-3 py-2 text-xs font-semibold text-white"
                     >
                         Ver detalhes
                     </Link>
