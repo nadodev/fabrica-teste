@@ -408,8 +408,7 @@ export default function CartPage({
                         )}
                         {freeShippingApplied && (
                             <div className="mt-4 rounded-lg bg-green-50 p-3 text-sm font-bold text-green-800">
-                                Frete grátis aplicado conforme as configurações
-                                da loja.
+                                Frete grátis.
                             </div>
                         )}
                         <form
