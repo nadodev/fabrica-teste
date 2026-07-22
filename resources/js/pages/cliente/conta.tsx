@@ -1,4 +1,4 @@
-import { Head, router, useForm } from '@inertiajs/react';
+import { Head, Link, router, useForm } from '@inertiajs/react';
 import {
     CheckCircle2,
     Home,
@@ -541,15 +541,21 @@ export default function CustomerAccount({
                                     <th className="px-5 py-3">Status</th>
                                     <th className="px-5 py-3">Total</th>
                                     <th className="px-5 py-3">Pagamento</th>
+                                    <th className="px-5 py-3 text-right">
+                                        Detalhes
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-border">
                                 {safeOrders.map((order) => (
                                     <tr key={order.id}>
                                         <td className="px-5 py-4">
-                                            <div className="font-bold text-navy">
+                                            <Link
+                                                href={`/minha-conta/pedidos/${order.id}`}
+                                                className="font-bold text-navy hover:underline"
+                                            >
                                                 {order.number}
-                                            </div>
+                                            </Link>
                                             <div className="text-xs text-text-muted">
                                                 {new Date(
                                                     order.createdAt,
@@ -577,6 +583,14 @@ export default function CustomerAccount({
                                                     order.paymentStatus,
                                                 )}
                                             </div>
+                                        </td>
+                                        <td className="px-5 py-4 text-right">
+                                            <Link
+                                                href={`/minha-conta/pedidos/${order.id}`}
+                                                className="inline-flex rounded-lg border border-border px-3 py-2 text-xs font-black text-navy hover:bg-bg-soft"
+                                            >
+                                                Ver pedido
+                                            </Link>
                                         </td>
                                     </tr>
                                 ))}

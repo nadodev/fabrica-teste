@@ -4,6 +4,7 @@ use App\Http\Controllers\AdminAuthController;
 use App\Http\Controllers\CustomerAccountController;
 use App\Http\Controllers\CustomerAddressController;
 use App\Http\Controllers\CustomerAuthController;
+use App\Http\Controllers\CustomerOrderController;
 use App\Http\Controllers\CustomerProfileController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\PublicSeoController;
@@ -44,6 +45,7 @@ Route::middleware('auth')->group(function (): void {
 });
 Route::get('/minha-conta', CustomerAccountController::class)->middleware(['auth', 'verified'])->name('cliente.conta');
 Route::middleware(['auth', 'verified', 'throttle:commerce'])->prefix('/minha-conta')->name('cliente.')->group(function (): void {
+    Route::get('/pedidos/{order}', [CustomerOrderController::class, 'show'])->whereUuid('order')->name('orders.show');
     Route::put('/perfil', [CustomerProfileController::class, 'update'])->name('profile.update');
     Route::post('/enderecos', [CustomerAddressController::class, 'store'])->name('addresses.store');
     Route::put('/enderecos/{address}', [CustomerAddressController::class, 'update'])->whereUuid('address')->name('addresses.update');
