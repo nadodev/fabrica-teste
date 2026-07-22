@@ -1,19 +1,40 @@
-import { Head, router } from '@inertiajs/react';
-import { Database, FileText, ShieldCheck } from 'lucide-react';
+import { Head, router, usePage } from '@inertiajs/react';
+import { Database, History, ShieldCheck } from 'lucide-react';
 import { createIdempotencyKey } from '@/lib/idempotency-key';
 import { AdminLayout } from '@/modules/admin/ui/admin-layout';
 
 type Check = { label: string; value: string };
+type AuditEntry = {
+    id: string;
+    action: string;
+    subjectType: string | null;
+    subjectId: string | null;
+    outcome: string;
+    httpStatus: number | null;
+    createdAt: string;
+    actorName: string;
+};
 
 export default function Operations({
     checks = [],
-    logs = [],
+    auditEntries = [],
     backups = [],
 }: {
     checks?: Check[];
-    logs?: string[];
+    auditEntries?: AuditEntry[];
     backups?: string[];
 }) {
+    const page = usePage<{
+        auth: {
+            user: {
+                permissions: string[];
+                is_super_admin: boolean;
+            };
+        };
+    }>();
+    const canBackup =
+        page.props.auth.user.is_super_admin ||
+        page.props.auth.user.permissions.includes('admin.backups.manage');
     const createBackup = () => {
         router.post(
             '/admin/operacao/backup',
@@ -55,12 +76,14 @@ export default function Operations({
                         <div className="mb-4 flex items-center gap-2 font-display text-lg font-black text-navy">
                             <Database className="h-5 w-5 text-yellow" /> Backup
                         </div>
-                        <button
-                            onClick={createBackup}
-                            className="rounded-lg bg-yellow px-5 py-3 font-black text-navy"
-                        >
-                            Criar backup do banco
-                        </button>
+                        {canBackup && (
+                            <button
+                                onClick={createBackup}
+                                className="rounded-lg bg-yellow px-5 py-3 font-black text-navy"
+                            >
+                                Criar backup do banco
+                            </button>
+                        )}
                         <div className="mt-4 space-y-2 text-sm text-text-muted">
                             {backups.map((backup) => (
                                 <div key={backup}>{backup}</div>
@@ -70,12 +93,53 @@ export default function Operations({
                 </section>
                 <section className="rounded-xl border border-border bg-white p-5">
                     <div className="mb-4 flex items-center gap-2 font-display text-lg font-black text-navy">
-                        <FileText className="h-5 w-5 text-yellow" /> Logs
-                        recentes
+                        <History className="h-5 w-5 text-yellow" /> Auditoria
+                        administrativa
                     </div>
-                    <pre className="max-h-[620px] overflow-auto rounded-lg bg-bg-soft p-4 text-xs whitespace-pre-wrap text-text-dark">
-                        {logs.join('\n') || 'Sem logs.'}
-                    </pre>
+                    <div className="max-h-[620px] space-y-2 overflow-auto">
+                        {auditEntries.map((entry) => (
+                            <article
+                                key={entry.id}
+                                className="rounded-lg border border-border bg-bg-soft p-3 text-xs"
+                            >
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <strong className="text-navy">
+                                        {entry.action}
+                                    </strong>
+                                    <span
+                                        className={
+                                            entry.outcome === 'completed'
+                                                ? 'font-bold text-green-700'
+                                                : entry.outcome === 'rejected'
+                                                  ? 'font-bold text-red-700'
+                                                  : 'font-bold text-amber-700'
+                                        }
+                                    >
+                                        {entry.outcome}
+                                    </span>
+                                </div>
+                                <div className="mt-1 text-text-muted">
+                                    {entry.actorName} ·{' '}
+                                    {new Date(entry.createdAt).toLocaleString(
+                                        'pt-BR',
+                                    )}
+                                    {entry.httpStatus
+                                        ? ` · HTTP ${entry.httpStatus}`
+                                        : ''}
+                                </div>
+                                {entry.subjectId && (
+                                    <div className="mt-1 break-all text-text-muted">
+                                        {entry.subjectType}: {entry.subjectId}
+                                    </div>
+                                )}
+                            </article>
+                        ))}
+                        {auditEntries.length === 0 && (
+                            <p className="rounded-lg bg-bg-soft p-4 text-sm text-text-muted">
+                                Nenhuma mutação administrativa registrada.
+                            </p>
+                        )}
+                    </div>
                 </section>
             </div>
         </AdminLayout>

@@ -36,8 +36,12 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('commerce', fn (Request $request): Limit => Limit::perMinute(30)->by(
             (string) ($request->user()?->getAuthIdentifier() ?? $request->ip()),
         ));
-        RateLimiter::for('authentication', fn (Request $request): Limit => Limit::perMinute(5)->by(
-            strtolower((string) $request->input('email')).'|'.$request->ip(),
+        RateLimiter::for('authentication', fn (Request $request): array => [
+            Limit::perMinute(20)->by((string) $request->ip()),
+            Limit::perMinute(5)->by(strtolower((string) $request->input('email')).'|'.$request->ip()),
+        ]);
+        RateLimiter::for('admin-two-factor', fn (Request $request): Limit => Limit::perMinute(10)->by(
+            (string) $request->session()->get('admin_login_challenge_id', 'missing').'|'.$request->ip(),
         ));
     }
 
@@ -52,14 +56,10 @@ class AppServiceProvider extends ServiceProvider
             app()->isProduction(),
         );
 
-        Password::defaults(fn (): ?Password => app()->isProduction()
-            ? Password::min(12)
-                ->mixedCase()
-                ->letters()
-                ->numbers()
-                ->symbols()
-                ->uncompromised()
-            : null,
-        );
+        Password::defaults(function (): Password {
+            $rule = Password::min(12)->mixedCase()->letters()->numbers();
+
+            return app()->isProduction() ? $rule->uncompromised() : $rule;
+        });
     }
 }

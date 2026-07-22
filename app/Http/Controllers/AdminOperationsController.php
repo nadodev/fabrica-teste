@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Modules\Administration\Application\Query\ListAdminAudit;
 use App\Modules\Payment\Application\Query\ShowPaymentWebhookHealth;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\File;
@@ -13,7 +14,7 @@ use Inertia\Response;
 
 final class AdminOperationsController extends Controller
 {
-    public function index(ShowPaymentWebhookHealth $webhooks): Response
+    public function index(ShowPaymentWebhookHealth $webhooks, ListAdminAudit $audit): Response
     {
         $health = $webhooks->handle();
 
@@ -28,7 +29,7 @@ final class AdminOperationsController extends Controller
                 ['label' => 'Webhooks Asaas processando', 'value' => (string) $health['processing']],
                 ['label' => 'Webhooks Asaas com falha final', 'value' => (string) $health['failed']],
             ],
-            'logs' => $this->recentLogs(),
+            'auditEntries' => $audit->handle(),
             'backups' => collect(Storage::disk('local')->files('backups'))
                 ->sortDesc()
                 ->take(10)
@@ -49,23 +50,5 @@ final class AdminOperationsController extends Controller
         Storage::disk('local')->put($name, File::get($database));
 
         return back()->with('success', 'Backup criado em storage/app/'.$name);
-    }
-
-    /** @return list<string> */
-    private function recentLogs(): array
-    {
-        $log = storage_path('logs/laravel.log');
-
-        if (! File::exists($log)) {
-            return [];
-        }
-
-        $lines = collect(explode("\n", File::get($log)))
-            ->filter()
-            ->take(-80)
-            ->values()
-            ->all();
-
-        return array_values($lines);
     }
 }

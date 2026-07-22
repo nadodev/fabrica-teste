@@ -102,12 +102,14 @@ ADRs registram o contexto e as consequências das decisões mais importantes.
 - Melhor Envio com credencial no ambiente, peso e dimensoes por produto e revalidacao no checkout.
 - Cadastro de clientes e enderecos com preenchimento automatico por CEP.
 - Maquina de estados administrativa e historico auditavel do pedido.
+- Permissoes administrativas por capacidade, proprietario protegido e auditoria sanitizada das mutacoes.
+- Segundo fator administrativo obrigatorio por codigo de e-mail descartavel.
 
 ## Próximas etapas
 
 - Completar etiqueta, expedicao e rastreamento no Melhor Envio.
 - Adicionar detalhe do pedido para o cliente e repeticao segura de pagamento.
-- Implementar recuperacao de senha, verificacao de e-mail e permissoes administrativas especificas.
+- Evoluir o segundo fator administrativo de e-mail para TOTP ou WebAuthn como endurecimento pós-MVP.
 - Paginar consultas administrativas e adicionar cache de configuracoes publicas.
 - Implantar backup/restauracao MySQL, metricas, alertas e testes concorrentes em InnoDB.
 

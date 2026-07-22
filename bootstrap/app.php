@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\AddSecurityHeaders;
+use App\Http\Middleware\AuditAdministrativeMutation;
 use App\Http\Middleware\EnsureUserIsAdmin;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Modules\Shared\Presentation\Http\Middleware\EnsureIdempotency;
@@ -24,6 +25,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'admin' => EnsureUserIsAdmin::class,
+            'audit.admin' => AuditAdministrativeMutation::class,
             'idempotent' => EnsureIdempotency::class,
         ]);
 

@@ -5,7 +5,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 it('changes an order through the domain policy and records the administrator', function () {
-    $admin = User::factory()->create(['is_admin' => true]);
+    $admin = User::factory()->admin()->create();
     $orderId = adminStatusOrder('paid');
     $createdAt = DB::table('ordering_orders')->where('id', $orderId)->value('created_at');
 
@@ -25,7 +25,7 @@ it('changes an order through the domain policy and records the administrator', f
 });
 
 it('rejects an invalid administrative status jump without changing the order', function () {
-    $admin = User::factory()->create(['is_admin' => true]);
+    $admin = User::factory()->admin()->create();
     $orderId = adminStatusOrder('awaiting_payment');
 
     $this->actingAs($admin)->post(route('admin.orders.status', $orderId), [

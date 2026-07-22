@@ -102,7 +102,7 @@ it('handles an unknown postal code without inventing an address', function () {
 });
 
 it('reports only whether the environment token is configured to the admin', function () {
-    $admin = User::factory()->create(['is_admin' => true]);
+    $admin = User::factory()->admin()->create();
     config()->set('services.melhor_envio.token', 'secret-production-token');
 
     $this->actingAs($admin)->get(route('admin.shipping.edit'))
@@ -115,7 +115,7 @@ it('reports only whether the environment token is configured to the admin', func
 });
 
 it('requires an environment token before enabling Melhor Envio', function () {
-    $admin = User::factory()->create(['is_admin' => true]);
+    $admin = User::factory()->admin()->create();
     config()->set('services.melhor_envio.token', null);
 
     $this->actingAs($admin)->post(route('admin.shipping.update'), [
@@ -128,7 +128,7 @@ it('requires an environment token before enabling Melhor Envio', function () {
 });
 
 it('requires an origin postal code before enabling Melhor Envio', function () {
-    $admin = User::factory()->create(['is_admin' => true]);
+    $admin = User::factory()->admin()->create();
     config()->set('services.melhor_envio.token', 'environment-token');
 
     $this->actingAs($admin)->post(route('admin.shipping.update'), [
@@ -207,7 +207,7 @@ it('reports when Melhor Envio rejects the configured credential', function () {
 });
 
 it('saves shipping settings without accepting a database token', function () {
-    $admin = User::factory()->create(['is_admin' => true]);
+    $admin = User::factory()->admin()->create();
     config()->set('services.melhor_envio.token', 'environment-token');
 
     $this->actingAs($admin)->post(route('admin.shipping.update'), [

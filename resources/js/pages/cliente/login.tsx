@@ -46,6 +46,14 @@ export default function CustomerLogin() {
                             className="input"
                         />
                     </Field>
+                    <div className="text-right">
+                        <Link
+                            href="/esqueci-senha"
+                            className="text-sm font-semibold text-navy hover:underline"
+                        >
+                            Esqueci minha senha
+                        </Link>
+                    </div>
                     <label className="flex items-center gap-2 text-sm text-text-muted">
                         <input
                             type="checkbox"

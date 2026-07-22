@@ -6,7 +6,7 @@
 
 ## Resumo executivo
 
-O sistema atual ja possui fluxo operacional de catalogo, carrinho, estoque, checkout, pedidos, frete e pagamento. Os riscos restantes concentram-se em permissoes administrativas granulares, tokenizacao de cartao, observabilidade, backup MySQL, LGPD e validacao concorrente em InnoDB.
+O sistema atual ja possui fluxo operacional de catalogo, carrinho, estoque, checkout, pedidos, frete e pagamento. Permissoes administrativas, auditoria sanitizada e segundo fator por e-mail estao implementados. Os riscos restantes concentram-se em MFA resistente a phishing, tokenizacao de cartao, observabilidade, backup MySQL, LGPD e validacao concorrente em InnoDB.
 
 ## Controles existentes
 
@@ -32,10 +32,10 @@ O sistema atual ja possui fluxo operacional de catalogo, carrinho, estoque, chec
 
 ### P1 — necessários antes de administração pública
 
-1. Autenticação, recuperação de senha e verificação de e-mail.
-2. Autorização por policies/permissões para catálogo, estoque, pedidos e reembolsos.
+1. Evoluir o segundo fator por e-mail para TOTP ou WebAuthn; recuperação, verificação, RBAC e o controle obrigatório atual estão implementados.
+2. Ampliar policies específicas quando novos fluxos de reembolso e devolução forem adicionados; as rotas administrativas atuais estão protegidas por capacidade.
 3. Rate limiting específico para login, checkout, cupom, frete e webhooks.
-4. Trilha de auditoria para ações administrativas e financeiras.
+4. Integrar alertas externos à trilha administrativa existente e ampliar a cobertura financeira.
 5. Validação por Form Requests e DTOs; controllers devem rejeitar campos desconhecidos.
 6. Cabeçalhos CSP, HSTS, `X-Content-Type-Options`, política de referrer e permissões.
 7. Upload seguro de imagens: MIME real, tamanho, dimensões, nomes aleatórios e storage isolado.

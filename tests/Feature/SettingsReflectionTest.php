@@ -71,7 +71,7 @@ it('serves configured robots content and a dynamic sitemap', function () {
 });
 
 it('persists only settings that have a real consumer', function () {
-    $admin = User::factory()->create(['is_admin' => true]);
+    $admin = User::factory()->admin()->create();
 
     $this->actingAs($admin)->post(route('admin.settings.update'), [
         'storeName' => 'Loja Configurada',

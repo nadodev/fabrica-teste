@@ -1,6 +1,10 @@
 <?php
 
 return [
+    'admin_audit_retention_days' => (int) env('ADMIN_AUDIT_RETENTION_DAYS', 365),
+    'admin_two_factor_ttl_minutes' => (int) env('ADMIN_TWO_FACTOR_TTL_MINUTES', 10),
+    'admin_two_factor_max_attempts' => (int) env('ADMIN_TWO_FACTOR_MAX_ATTEMPTS', 5),
+    'admin_two_factor_retention_days' => (int) env('ADMIN_TWO_FACTOR_RETENTION_DAYS', 30),
     'csp_report_only' => (bool) env('SECURITY_CSP_REPORT_ONLY', true),
     'content_security_policy' => env(
         'SECURITY_CONTENT_SECURITY_POLICY',

@@ -14,8 +14,8 @@
 | Pagamentos                  | Gateway falso e Asaas real implementados                            | Sim                 |
 | Frete                       | Cotacao e revalidacao Melhor Envio implementadas; etiqueta pendente | Sim                 |
 | Clientes e endereços        | Implementados                                                       | Sim                 |
-| Painel administrativo       | Implementado; paginacao e RBAC pendentes                            | Sim                 |
-| Autenticação/autorização    | Login implementado; recuperacao e verificacao pendentes             | Sim                 |
+| Painel administrativo       | Implementado com RBAC; paginacao pendente                           | Sim                 |
+| Autenticação/autorização    | Login, recuperação, verificação, RBAC e segundo fator por e-mail implementados | Sim          |
 | Webhooks e reconciliação    | Implementados com retry e dead-letter                               | Sim                 |
 | Observabilidade operacional | Parcial                                                             | Sim                 |
 | LGPD e políticas comerciais | Politicas publicas parciais; ciclo do titular pendente              | Sim                 |
@@ -98,7 +98,7 @@
 
 1. Etiqueta, expedicao e rastreamento.
 2. Detalhe do pedido e repeticao segura de pagamento.
-3. Recuperacao de senha, verificacao de e-mail e permissoes administrativas.
+3. TOTP ou WebAuthn para administradores como endurecimento pós-MVP.
 4. Paginacao, cache e observabilidade.
 5. Backup/restauracao MySQL e alertas operacionais.
 6. LGPD, carga, concorrencia InnoDB e lancamento controlado.

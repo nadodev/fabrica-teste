@@ -87,7 +87,9 @@ export function CatalogProductCard({
                 </div>
                 <div
                     className={
-                        variant === 'list' ? 'flex flex-wrap gap-2' : 'flex gap-2 items-center'
+                        variant === 'list'
+                            ? 'flex flex-wrap gap-2'
+                            : 'flex items-center gap-2'
                     }
                 >
                     <Link

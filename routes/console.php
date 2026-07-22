@@ -1,5 +1,7 @@
 <?php
 
+use App\Modules\Administration\Application\Command\PruneAdminAuditLogs;
+use App\Modules\Administration\Application\Command\PruneAdminLoginChallenges;
 use App\Modules\Inventory\Application\Command\ExpireStockReservations;
 use App\Modules\Ordering\Application\Command\ProcessOrderOutbox;
 use App\Modules\Payment\Application\Command\ProcessAsaasWebhooks;
@@ -60,6 +62,20 @@ Artisan::command('outbox:process-orders {--limit=50}', function (ProcessOrderOut
 })->purpose('Process pending order notifications from the transactional outbox');
 
 Schedule::command('outbox:process-orders --limit=50')->everyMinute()->withoutOverlapping();
+
+Artisan::command('admin:audit-prune', function (PruneAdminAuditLogs $pruner): void {
+    $deleted = $pruner->handle((int) config('security.admin_audit_retention_days'));
+    $this->info("{$deleted} registro(s) antigo(s) de auditoria removido(s).");
+})->purpose('Remove administrative audit entries older than the configured retention period');
+
+Schedule::command('admin:audit-prune')->dailyAt('03:15')->withoutOverlapping();
+
+Artisan::command('admin:login-challenges-prune', function (PruneAdminLoginChallenges $pruner): void {
+    $deleted = $pruner->handle((int) config('security.admin_two_factor_retention_days'));
+    $this->info("{$deleted} desafio(s) antigo(s) de acesso administrativo removido(s).");
+})->purpose('Remove expired administrative login challenges after the retention period');
+
+Schedule::command('admin:login-challenges-prune')->dailyAt('03:30')->withoutOverlapping();
 
 Artisan::command('inventory:expire-reservations {--limit=100}', function (ExpireStockReservations $expirer): void {
     $expired = $expirer->handle((int) $this->option('limit'));

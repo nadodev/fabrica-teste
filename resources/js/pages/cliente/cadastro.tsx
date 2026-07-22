@@ -61,6 +61,10 @@ export default function CustomerRegister() {
                             }
                             className="input"
                         />
+                        <span className="mt-1 block text-xs font-normal text-text-muted">
+                            Use pelo menos 12 caracteres, com maiúscula,
+                            minúscula e número.
+                        </span>
                     </Field>
                     <Field label="Confirmar senha">
                         <input

@@ -17,16 +17,17 @@ it('protects the product dashboard from guests and non admins', function () {
     $this->actingAs($user)->get(route('admin.products.index'))->assertForbidden();
 });
 
-it('authenticates an administrator and regenerates the session', function () {
-    User::factory()->create(['email' => 'admin@example.com', 'password' => 'secret-password', 'is_admin' => true]);
+it('requires the second factor before authenticating an administrator', function () {
+    User::factory()->admin()->create(['email' => 'admin@example.com', 'password' => 'secret-password']);
 
     $this->post(route('admin.login.store'), ['email' => 'admin@example.com', 'password' => 'secret-password'])
-        ->assertRedirect(route('admin.products.index'));
-    $this->assertAuthenticated();
+        ->assertRedirect(route('admin.two-factor'))
+        ->assertSessionHas('admin_login_challenge_id');
+    $this->assertGuest();
 });
 
 it('allows an administrator to create a server-priced product', function () {
-    $admin = User::factory()->create(['is_admin' => true]);
+    $admin = User::factory()->admin()->create();
     $payload = [
         'sku' => 'ADMIN-001',
         'name' => 'Produto cadastrado no painel',
@@ -61,7 +62,7 @@ it('allows an administrator to create a server-priced product', function () {
 
 it('uploads, updates and archives a product without deleting its history', function () {
     Storage::fake('public');
-    $admin = User::factory()->create(['is_admin' => true]);
+    $admin = User::factory()->admin()->create();
     $image = UploadedFile::fake()->image('product.jpg', 800, 800);
 
     $this->actingAs($admin)->post(route('admin.products.store'), [
@@ -94,7 +95,7 @@ it('uploads, updates and archives a product without deleting its history', funct
 
 it('rejects unsafe image formats', function () {
     Storage::fake('public');
-    $admin = User::factory()->create(['is_admin' => true]);
+    $admin = User::factory()->admin()->create();
 
     $this->actingAs($admin)->from(route('admin.products.create'))->post(route('admin.products.store'), [
         'sku' => 'SVG-001',

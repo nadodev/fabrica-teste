@@ -20,15 +20,14 @@ class DatabaseSeeder extends Seeder
         $password = config('admin.password');
 
         if (! app()->isProduction() || is_string($password)) {
-            User::query()->updateOrCreate(
-                ['email' => config('admin.email')],
-                [
-                    'name' => config('admin.name'),
-                    'password' => $password ?: 'password',
-                    'is_admin' => true,
-                    'email_verified_at' => now(),
-                ],
-            );
+            $administrator = User::query()->firstOrNew(['email' => config('admin.email')]);
+            $administrator->forceFill([
+                'name' => config('admin.name'),
+                'password' => $password ?: 'password',
+                'is_admin' => true,
+                'is_super_admin' => true,
+                'email_verified_at' => now(),
+            ])->save();
         }
     }
 }

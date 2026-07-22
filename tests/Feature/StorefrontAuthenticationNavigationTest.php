@@ -14,9 +14,13 @@ it('shares the current storefront identity for guests customers and administrato
     $customer = User::factory()->create(['is_admin' => false]);
     $this->actingAs($customer)->get(route('home'))->assertOk()->assertInertia(fn (Assert $page) => $page
         ->where('auth.user.email', $customer->email)
-        ->where('auth.user.is_admin', false));
+        ->where('auth.user.is_admin', false)
+        ->missing('auth.user.phone')
+        ->missing('auth.user.document')
+        ->missing('auth.user.created_at')
+        ->missing('auth.user.updated_at'));
 
-    $admin = User::factory()->create(['is_admin' => true]);
+    $admin = User::factory()->admin()->create();
     $this->actingAs($admin)->get(route('home'))->assertOk()->assertInertia(fn (Assert $page) => $page
         ->where('auth.user.email', $admin->email)
         ->where('auth.user.is_admin', true));
@@ -27,7 +31,7 @@ it('invalidates customer and administrator sessions on logout', function () {
     $this->actingAs($customer)->post(route('cliente.logout'))->assertRedirect(route('home'));
     $this->assertGuest();
 
-    $admin = User::factory()->create(['is_admin' => true]);
+    $admin = User::factory()->admin()->create();
     $this->actingAs($admin)->post(route('admin.logout'))->assertRedirect(route('home'));
     $this->assertGuest();
 });

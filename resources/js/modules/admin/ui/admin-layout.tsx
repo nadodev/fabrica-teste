@@ -16,6 +16,7 @@ import {
     Tags,
     Text,
     Truck,
+    UserCog,
     Users,
     Warehouse,
 } from 'lucide-react';
@@ -26,6 +27,7 @@ type NavigationItem = {
     href: string;
     label: string;
     icon: LucideIcon;
+    permission: string;
 };
 
 const navigationGroups: Array<{
@@ -35,29 +37,53 @@ const navigationGroups: Array<{
     {
         label: 'Catálogo',
         items: [
-            { href: '/admin/produtos', label: 'Produtos', icon: Boxes },
+            {
+                href: '/admin/produtos',
+                label: 'Produtos',
+                icon: Boxes,
+                permission: 'admin.catalog.view',
+            },
             {
                 href: '/admin/categorias-produtos',
                 label: 'Categorias',
                 icon: Tags,
+                permission: 'admin.catalog.view',
             },
-            { href: '/admin/estoque', label: 'Estoque', icon: Warehouse },
+            {
+                href: '/admin/estoque',
+                label: 'Estoque',
+                icon: Warehouse,
+                permission: 'admin.inventory.view',
+            },
         ],
     },
     {
         label: 'Vendas',
         items: [
-            { href: '/admin/pedidos', label: 'Pedidos', icon: ClipboardList },
+            {
+                href: '/admin/pedidos',
+                label: 'Pedidos',
+                icon: ClipboardList,
+                permission: 'admin.orders.view',
+            },
             {
                 href: '/admin/cupons',
                 label: 'Cupons e promoções',
                 icon: BadgePercent,
+                permission: 'admin.coupons.manage',
             },
         ],
     },
     {
         label: 'Clientes',
-        items: [{ href: '/admin/clientes', label: 'Clientes', icon: Users }],
+        items: [
+            {
+                href: '/admin/clientes',
+                label: 'Clientes',
+                icon: Users,
+                permission: 'admin.customers.view',
+            },
+        ],
     },
     {
         label: 'Conteúdo',
@@ -66,23 +92,32 @@ const navigationGroups: Array<{
                 href: '/admin/conteudo/banners',
                 label: 'Banners',
                 icon: Image,
+                permission: 'admin.content.manage',
             },
             {
                 href: '/admin/conteudo/notificacoes',
                 label: 'Notificações',
                 icon: Bell,
+                permission: 'admin.content.manage',
             },
             {
                 href: '/admin/conteudo/lojas',
                 label: 'Lojas',
                 icon: MapPin,
+                permission: 'admin.content.manage',
             },
             {
                 href: '/admin/conteudo/historia',
                 label: 'Nossa história',
                 icon: Text,
+                permission: 'admin.content.manage',
             },
-            { href: '/admin/marketing', label: 'Marketing', icon: Megaphone },
+            {
+                href: '/admin/marketing',
+                label: 'Marketing',
+                icon: Megaphone,
+                permission: 'admin.content.manage',
+            },
         ],
     },
     {
@@ -92,6 +127,7 @@ const navigationGroups: Array<{
                 href: '/admin/relatorios',
                 label: 'Relatórios',
                 icon: BarChart3,
+                permission: 'admin.reports.view',
             },
         ],
     },
@@ -102,16 +138,25 @@ const navigationGroups: Array<{
                 href: '/admin/configuracoes',
                 label: 'Geral',
                 icon: Settings,
+                permission: 'admin.settings.manage',
             },
             {
                 href: '/admin/frete',
                 label: 'Frete e entrega',
                 icon: Truck,
+                permission: 'admin.shipping.manage',
             },
             {
                 href: '/admin/operacao',
                 label: 'Sistema e segurança',
                 icon: ShieldCheck,
+                permission: 'admin.operations.view',
+            },
+            {
+                href: '/admin/usuarios',
+                label: 'Usuários e permissões',
+                icon: UserCog,
+                permission: 'admin.administrators.manage',
             },
         ],
     },
@@ -125,12 +170,20 @@ export function AdminLayout({
     children: ReactNode;
 }) {
     const page = usePage<{
-        auth: { user: { name: string } };
+        auth: {
+            user: {
+                name: string;
+                permissions: string[];
+                is_super_admin: boolean;
+            };
+        };
         siteSettings: { storeName: string; logoUrl: string };
     }>();
     const user = page.props.auth.user;
     const settings = page.props.siteSettings;
     const currentPath = page.url.split('?')[0];
+    const can = (permission: string) =>
+        user.is_super_admin || user.permissions.includes(permission);
 
     return (
         <div className="min-h-screen bg-bg-soft lg:grid lg:grid-cols-[250px_1fr]">
@@ -157,30 +210,39 @@ export function AdminLayout({
                             href: '/admin',
                             label: 'Dashboard',
                             icon: LayoutDashboard,
+                            permission: 'admin.dashboard.view',
                         }}
                         active={currentPath === '/admin'}
                     />
-                    {navigationGroups.map((group) => (
-                        <section key={group.label}>
-                            <h2 className="px-3 text-[11px] font-black tracking-[0.14em] text-white/45 uppercase">
-                                {group.label}
-                            </h2>
-                            <div className="mt-1 space-y-1 border-l border-white/10 pl-2">
-                                {group.items.map((item) => (
-                                    <AdminNavLink
-                                        key={item.href}
-                                        item={item}
-                                        active={
-                                            currentPath === item.href ||
-                                            currentPath.startsWith(
-                                                `${item.href}/`,
-                                            )
-                                        }
-                                    />
-                                ))}
-                            </div>
-                        </section>
-                    ))}
+                    {navigationGroups
+                        .map((group) => ({
+                            ...group,
+                            items: group.items.filter((item) =>
+                                can(item.permission),
+                            ),
+                        }))
+                        .filter((group) => group.items.length > 0)
+                        .map((group) => (
+                            <section key={group.label}>
+                                <h2 className="px-3 text-[11px] font-black tracking-[0.14em] text-white/45 uppercase">
+                                    {group.label}
+                                </h2>
+                                <div className="mt-1 space-y-1 border-l border-white/10 pl-2">
+                                    {group.items.map((item) => (
+                                        <AdminNavLink
+                                            key={item.href}
+                                            item={item}
+                                            active={
+                                                currentPath === item.href ||
+                                                currentPath.startsWith(
+                                                    `${item.href}/`,
+                                                )
+                                            }
+                                        />
+                                    ))}
+                                </div>
+                            </section>
+                        ))}
                     <div className="border-t border-white/10 pt-4">
                         <Link
                             href="/produtos"

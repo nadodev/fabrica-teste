@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Modules\Administration\Application\Port\AdminPermissionChecker;
 use App\Support\StoreSettings;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -54,7 +55,17 @@ class HandleInertiaRequests extends Middleware
                 'system' => app(StoreSettings::class)->system(),
             ],
             'auth' => [
-                'user' => $request->user(),
+                'user' => $request->user() === null ? null : [
+                    'id' => (int) $request->user()->getAuthIdentifier(),
+                    'name' => (string) $request->user()->name,
+                    'email' => (string) $request->user()->email,
+                    'email_verified_at' => $request->user()->email_verified_at?->toIso8601String(),
+                    'is_admin' => (bool) $request->user()->is_admin,
+                    'is_super_admin' => (bool) $request->user()->is_super_admin,
+                    'permissions' => $request->user()->is_admin
+                        ? app(AdminPermissionChecker::class)->permissionValues((int) $request->user()->getAuthIdentifier())
+                        : [],
+                ],
             ],
             'flash' => [
                 'success' => $request->session()->get('success'),
