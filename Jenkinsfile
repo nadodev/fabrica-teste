@@ -16,7 +16,7 @@ pipeline {
                           -o BatchMode=yes \
                           -o StrictHostKeyChecking=accept-new \
                           -o ConnectTimeout=10 \
-                          deploy@127.0.0.1 \
+                          deploy@179.197.237.14 \
                           "echo 'Conexão SSH com o servidor realizada com sucesso'"
                     '''
                 }
@@ -30,7 +30,7 @@ pipeline {
                         ssh \
                           -o BatchMode=yes \
                           -o StrictHostKeyChecking=accept-new \
-                          deploy@127.0.0.1 \
+                          deploy@179.197.237.14 \
                           "cd /opt/apps/fabrica-loja && ./deploy.sh"
                     '''
                 }
@@ -44,7 +44,7 @@ pipeline {
                         ssh \
                           -o BatchMode=yes \
                           -o StrictHostKeyChecking=accept-new \
-                          deploy@127.0.0.1 \
+                          deploy@179.197.237.14 \
                           "cd /opt/apps/fabrica-loja && docker compose --env-file .env.production -f compose.production.yml ps"
                     '''
                 }
