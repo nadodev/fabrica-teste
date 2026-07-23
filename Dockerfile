@@ -38,7 +38,15 @@ COPY package.json ./
 RUN npm install --include=dev --no-audit --no-fund
 
 COPY . .
-RUN composer dump-autoload --no-dev --classmap-authoritative --no-interaction \
+
+RUN mkdir -p \
+        storage/framework/cache/data \
+        storage/framework/sessions \
+        storage/framework/views \
+        storage/logs \
+        bootstrap/cache \
+    && composer dump-autoload --no-dev --classmap-authoritative --no-interaction \
+    && php artisan wayfinder:generate --with-form \
     && npm run build \
     && rm -rf node_modules
 
