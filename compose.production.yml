@@ -1,0 +1,128 @@
+name: fabrica-loja
+
+x-app: &app
+  image: fabrica-loja-app:${IMAGE_TAG:-latest}
+  build:
+    context: .
+    target: app
+  env_file:
+    - ${ENV_FILE:-.env.production}
+  restart: unless-stopped
+  networks:
+    - backend
+  volumes:
+    - app_storage:/var/www/html/storage
+  depends_on:
+    mysql:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+
+services:
+  caddy:
+    image: caddy:2.8-alpine
+    restart: unless-stopped
+    environment:
+      APP_HOST: ${APP_HOST:?Defina APP_HOST no arquivo .env.production}
+      ACME_EMAIL: ${ACME_EMAIL:?Defina ACME_EMAIL no arquivo .env.production}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    networks:
+      - frontend
+    volumes:
+      - ./docker/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      web:
+        condition: service_healthy
+
+  web:
+    image: fabrica-loja-web:${IMAGE_TAG:-latest}
+    build:
+      context: .
+      target: web
+    restart: unless-stopped
+    networks:
+      - frontend
+      - backend
+    volumes:
+      - app_storage:/var/www/html/storage:ro
+    depends_on:
+      app:
+        condition: service_healthy
+
+  app:
+    <<: *app
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  migrate:
+    <<: *app
+    restart: "no"
+    command: ["php", "artisan", "migrate", "--force", "--isolated"]
+
+  queue:
+    <<: *app
+    command: ["php", "artisan", "queue:work", "redis", "--sleep=2", "--tries=3", "--timeout=120", "--max-time=3600"]
+    stop_grace_period: 2m
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  scheduler:
+    <<: *app
+    command: ["php", "artisan", "schedule:work"]
+    stop_grace_period: 30s
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE:?Defina DB_DATABASE no arquivo .env.production}
+      MYSQL_USER: ${DB_USERNAME:?Defina DB_USERNAME no arquivo .env.production}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?Defina DB_PASSWORD no arquivo .env.production}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?Defina DB_ROOT_PASSWORD no arquivo .env.production}
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    networks:
+      - backend
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:?Defina REDIS_PASSWORD no arquivo .env.production}"]
+    networks:
+      - backend
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a $$REDIS_PASSWORD ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+networks:
+  frontend:
+  backend:
+    internal: true
+
+volumes:
+  app_storage:
+  mysql_data:
+  redis_data:
+  caddy_data:
+  caddy_config:
